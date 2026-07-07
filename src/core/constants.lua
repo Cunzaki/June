@@ -1,0 +1,36 @@
+local M = {}
+
+local sqrt, floor, min, max = math.sqrt, math.floor, math.min, math.max
+M.sqrt = sqrt
+M.floor = floor
+M.min = min
+M.max = max
+M.clamp = function(v, minimum, maximum)
+    return v < minimum and minimum or v > maximum and maximum or v
+end
+
+local BOX_TYPE = {STANDARD = 0, CORNER = 1, THREE_D = 2}
+local AIM_TARGET = {CROSSHAIR = 0, DISTANCE = 1}
+local AIM_BONE = {HEAD = 0, TORSO = 1, LEFT_ARM = 2, RIGHT_ARM = 3, LEFT_LEG = 4, RIGHT_LEG = 5, CLOSEST = 6}
+local VIEW_LINE_STYLE = {SOLID = 0, DASHED = 1, FADE = 2}
+local TARGET_LINE_STYLE = {SOLID = 0, DASHED = 1, DOTTED = 2}
+local FOV_STYLE = {CIRCLE = 0, FILLED_CIRCLE = 1, DOTTED = 2, SQUARE = 3, FILLED_SQUARE = 4, DASHED = 5}
+local TRACER_ORIGIN = {BOTTOM = 0, CENTER = 1, MOUSE = 2}
+local TRACER_STYLE = {SOLID = 0, DASHED = 1, DOTTED = 2}
+local DIST = {MIN_PLAYER = 0, MAX_PLAYER_SQ = 250000, HEALTH_CHECK_SQ = 10000, NAME_MATCH_SQ = 400, ESP_HIDE_SQ = 9}
+local MIN_BONES_REQUIRED = 5
+local HEALTH_CACHE_TIMEOUT = 1.0
+
+M.BOX_TYPE = BOX_TYPE
+M.AIM_TARGET = AIM_TARGET
+M.AIM_BONE = AIM_BONE
+M.VIEW_LINE_STYLE = VIEW_LINE_STYLE
+M.TARGET_LINE_STYLE = TARGET_LINE_STYLE
+M.FOV_STYLE = FOV_STYLE
+M.TRACER_ORIGIN = TRACER_ORIGIN
+M.TRACER_STYLE = TRACER_STYLE
+M.DIST = DIST
+M.MIN_BONES_REQUIRED = MIN_BONES_REQUIRED
+M.HEALTH_CACHE_TIMEOUT = HEALTH_CACHE_TIMEOUT
+
+return M
