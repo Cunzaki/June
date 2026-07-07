@@ -14,7 +14,7 @@ Paste this in Vector and execute:
 utility.load_url("https://raw.githubusercontent.com/Cunzaki/June/refs/heads/main/june.lua")
 ```
 
-Or run [`load.lua`](load.lua) from this repo (includes error handling).
+Or run [`load.lua`](load.lua) from this repo.
 
 Open the menu: **Scripts → June**
 
