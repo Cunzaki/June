@@ -1,4 +1,4 @@
---[[ Silent ray origin — camera to target (Operation One hitscan). ]]
+--[[ Silent ray origin — camera to target (hitscan). ]]
 
 local silent_ray = June.require("core.silent_ray")
 

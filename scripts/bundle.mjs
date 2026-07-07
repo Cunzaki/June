@@ -43,7 +43,7 @@ const ORDER = [
 ];
 
 const header = `--[[
-    June — Project Vector script for Operation One
+    June — Project Vector script
     Built: ${new Date().toISOString()}
 ]]
 

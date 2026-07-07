@@ -1,6 +1,6 @@
 # Assets
 
-Gadget and operator icons for **June** (Operation One).
+Gadget and operator icons for **June**.
 
 ## Generate
 
@@ -18,7 +18,7 @@ Asset IDs come from `dump/properties/ImageLabel.jsonl` (local dev only).
 After pushing to GitHub, runtime loads via one HTTPS URL per image:
 
 ```
-https://raw.githubusercontent.com/Cunzaki/April-Operation-One/refs/heads/main/assets/gadgets/{assetId}.png
+https://raw.githubusercontent.com/Cunzaki/June/refs/heads/main/assets/gadgets/{assetId}.png
 ```
 
 See `src/game/asset_urls.lua`.
