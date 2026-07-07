@@ -11,6 +11,10 @@ local CAMERA_MODELS = {
     StickyCamera = true,
 }
 
+local garbage_parent = nil
+local objects_parent = nil
+local pooled_refs_ready = false
+
 local function is_valid(inst)
     if not inst then
         return false
@@ -43,6 +47,17 @@ local function part_visible(part)
     return true
 end
 
+local function ensure_pooled_refs()
+    if pooled_refs_ready then
+        return
+    end
+    pooled_refs_ready = true
+    if game and game.ReplicatedStorage then
+        garbage_parent = game.ReplicatedStorage:FindFirstChild("Garbage")
+        objects_parent = game.ReplicatedStorage:FindFirstChild("Objects")
+    end
+end
+
 local function is_pooled(obj)
     local parent = obj and (obj.Parent or obj.parent)
     if not parent then
@@ -52,15 +67,12 @@ local function is_pooled(obj)
     if pname == "Garbage" or pname == "Objects" then
         return true
     end
-    if game and game.ReplicatedStorage then
-        local garbage = game.ReplicatedStorage:FindFirstChild("Garbage")
-        if garbage and parent == garbage then
-            return true
-        end
-        local objects = game.ReplicatedStorage:FindFirstChild("Objects")
-        if objects and parent == objects then
-            return true
-        end
+    ensure_pooled_refs()
+    if garbage_parent and parent == garbage_parent then
+        return true
+    end
+    if objects_parent and parent == objects_parent then
+        return true
     end
     return false
 end
@@ -69,7 +81,7 @@ function M.is_camera_model(name)
     return CAMERA_MODELS[name] == true
 end
 
-function M.is_camera_broken(obj)
+function M.is_camera_broken(obj, cam_part, dot_part)
     if not is_valid(obj) then
         return true
     end
@@ -77,12 +89,18 @@ function M.is_camera_broken(obj)
         return true
     end
 
-    local dot = obj:FindFirstChild("Dot")
+    local dot = dot_part
+    if dot == nil then
+        dot = obj:FindFirstChild("Dot")
+    end
     if dot and dot.Transparency ~= nil and dot.Transparency >= 1 then
         return true
     end
 
-    local cam = obj:FindFirstChild("Cam")
+    local cam = cam_part
+    if cam == nil then
+        cam = obj:FindFirstChild("Cam")
+    end
     if not part_visible(cam) then
         return true
     end
@@ -115,22 +133,30 @@ function M.is_workspace_placed(obj, ws)
     return parent and (parent.ClassName == "Workspace" or parent == game.Workspace)
 end
 
-function M.is_broken(obj, item)
+function M.is_broken(obj, item, anchor_part)
     if not obj then
         return true
     end
 
     local kind = (item and item.name) or obj.Name
     if M.is_camera_model(kind) then
-        return M.is_camera_broken(obj)
+        local cam = anchor_part
+        local dot = nil
+        if cam and cam.Name == "Cam" then
+            dot = obj:FindFirstChild("Dot")
+        end
+        return M.is_camera_broken(obj, cam, dot)
     end
 
     if get_attr(obj, "Disabled") == true then
         return true
     end
 
-    local anchor_name = (item and (item.anchor_part or item.priority_part)) or "Root"
-    local anchor = obj:FindFirstChild(anchor_name)
+    local anchor = anchor_part
+    if not anchor or not is_valid(anchor) then
+        local anchor_name = (item and (item.anchor_part or item.priority_part)) or "Root"
+        anchor = obj:FindFirstChild(anchor_name)
+    end
     if anchor and not part_visible(anchor) then
         return true
     end
@@ -138,14 +164,20 @@ function M.is_broken(obj, item)
     return false
 end
 
-function M.is_trackable(obj, item, ws)
+function M.is_trackable(obj, item, ws, anchor_part)
     if not obj or not item then
         return false
     end
     if item.map_only then
-        return M.is_map_camera_placed(obj, ws) and not M.is_camera_broken(obj)
+        if not is_valid(obj) or is_pooled(obj) then
+            return false
+        end
+        return not M.is_camera_broken(obj, anchor_part, nil)
     end
-    return M.is_workspace_placed(obj, ws) and not M.is_broken(obj, item)
+    if not M.is_workspace_placed(obj, ws) then
+        return false
+    end
+    return not M.is_broken(obj, item, anchor_part)
 end
 
 function M.find_anchor(obj, item)
@@ -204,14 +236,14 @@ function M.find_anchor(obj, item)
     return nil
 end
 
-function M.camera_status_label(obj, base_label)
+function M.camera_status_label(obj, base_label, cam_part)
     if not is_valid(obj) then
         return base_label
     end
     if get_attr(obj, "Disabled") == true then
         return base_label .. " (OFF)"
     end
-    if M.is_camera_broken(obj) then
+    if M.is_camera_broken(obj, cam_part, nil) then
         return base_label .. " (BROKEN)"
     end
     return base_label

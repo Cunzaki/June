@@ -4,6 +4,14 @@ local env = OperationOne.require("core.env")
 
 local M = {}
 
+local cached_identity = nil
+local cached_identity_at = 0
+local IDENTITY_MS = 500
+
+local function tick_ms()
+    return utility and utility.get_tick_count and utility.get_tick_count() or 0
+end
+
 local function get_attr(inst, name)
     if not inst or type(inst.GetAttribute) ~= "function" then
         return nil
@@ -12,8 +20,15 @@ local function get_attr(inst, name)
 end
 
 local function local_identity()
+    local now = tick_ms()
+    if cached_identity and now - cached_identity_at < IDENTITY_MS then
+        return cached_identity
+    end
+
     local lp = env.get_local_player()
     if not lp then
+        cached_identity = nil
+        cached_identity_at = now
         return nil
     end
 
@@ -34,11 +49,13 @@ local function local_identity()
         end
     end
 
-    return {
+    cached_identity = {
         user_id = user_id,
         team = team,
         spectator = spectator == true,
     }
+    cached_identity_at = now
+    return cached_identity
 end
 
 function M.ownership_level(obj)

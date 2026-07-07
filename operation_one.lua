@@ -1,6 +1,6 @@
 --[[
     April Operation One for Project Vector
-    Built: 2026-07-07T09:06:29.049Z
+    Built: 2026-07-07T09:41:29.485Z
 ]]
 
 OperationOne = {
@@ -498,6 +498,14 @@ local env = OperationOne.require("core.env")
 
 local M = {}
 
+local cached_identity = nil
+local cached_identity_at = 0
+local IDENTITY_MS = 500
+
+local function tick_ms()
+    return utility and utility.get_tick_count and utility.get_tick_count() or 0
+end
+
 local function get_attr(inst, name)
     if not inst or type(inst.GetAttribute) ~= "function" then
         return nil
@@ -506,8 +514,15 @@ local function get_attr(inst, name)
 end
 
 local function local_identity()
+    local now = tick_ms()
+    if cached_identity and now - cached_identity_at < IDENTITY_MS then
+        return cached_identity
+    end
+
     local lp = env.get_local_player()
     if not lp then
+        cached_identity = nil
+        cached_identity_at = now
         return nil
     end
 
@@ -528,11 +543,13 @@ local function local_identity()
         end
     end
 
-    return {
+    cached_identity = {
         user_id = user_id,
         team = team,
         spectator = spectator == true,
     }
+    cached_identity_at = now
+    return cached_identity
 end
 
 function M.ownership_level(obj)
@@ -587,6 +604,10 @@ local CAMERA_MODELS = {
     StickyCamera = true,
 }
 
+local garbage_parent = nil
+local objects_parent = nil
+local pooled_refs_ready = false
+
 local function is_valid(inst)
     if not inst then
         return false
@@ -619,6 +640,17 @@ local function part_visible(part)
     return true
 end
 
+local function ensure_pooled_refs()
+    if pooled_refs_ready then
+        return
+    end
+    pooled_refs_ready = true
+    if game and game.ReplicatedStorage then
+        garbage_parent = game.ReplicatedStorage:FindFirstChild("Garbage")
+        objects_parent = game.ReplicatedStorage:FindFirstChild("Objects")
+    end
+end
+
 local function is_pooled(obj)
     local parent = obj and (obj.Parent or obj.parent)
     if not parent then
@@ -628,15 +660,12 @@ local function is_pooled(obj)
     if pname == "Garbage" or pname == "Objects" then
         return true
     end
-    if game and game.ReplicatedStorage then
-        local garbage = game.ReplicatedStorage:FindFirstChild("Garbage")
-        if garbage and parent == garbage then
-            return true
-        end
-        local objects = game.ReplicatedStorage:FindFirstChild("Objects")
-        if objects and parent == objects then
-            return true
-        end
+    ensure_pooled_refs()
+    if garbage_parent and parent == garbage_parent then
+        return true
+    end
+    if objects_parent and parent == objects_parent then
+        return true
     end
     return false
 end
@@ -645,7 +674,7 @@ function M.is_camera_model(name)
     return CAMERA_MODELS[name] == true
 end
 
-function M.is_camera_broken(obj)
+function M.is_camera_broken(obj, cam_part, dot_part)
     if not is_valid(obj) then
         return true
     end
@@ -653,12 +682,18 @@ function M.is_camera_broken(obj)
         return true
     end
 
-    local dot = obj:FindFirstChild("Dot")
+    local dot = dot_part
+    if dot == nil then
+        dot = obj:FindFirstChild("Dot")
+    end
     if dot and dot.Transparency ~= nil and dot.Transparency >= 1 then
         return true
     end
 
-    local cam = obj:FindFirstChild("Cam")
+    local cam = cam_part
+    if cam == nil then
+        cam = obj:FindFirstChild("Cam")
+    end
     if not part_visible(cam) then
         return true
     end
@@ -691,22 +726,30 @@ function M.is_workspace_placed(obj, ws)
     return parent and (parent.ClassName == "Workspace" or parent == game.Workspace)
 end
 
-function M.is_broken(obj, item)
+function M.is_broken(obj, item, anchor_part)
     if not obj then
         return true
     end
 
     local kind = (item and item.name) or obj.Name
     if M.is_camera_model(kind) then
-        return M.is_camera_broken(obj)
+        local cam = anchor_part
+        local dot = nil
+        if cam and cam.Name == "Cam" then
+            dot = obj:FindFirstChild("Dot")
+        end
+        return M.is_camera_broken(obj, cam, dot)
     end
 
     if get_attr(obj, "Disabled") == true then
         return true
     end
 
-    local anchor_name = (item and (item.anchor_part or item.priority_part)) or "Root"
-    local anchor = obj:FindFirstChild(anchor_name)
+    local anchor = anchor_part
+    if not anchor or not is_valid(anchor) then
+        local anchor_name = (item and (item.anchor_part or item.priority_part)) or "Root"
+        anchor = obj:FindFirstChild(anchor_name)
+    end
     if anchor and not part_visible(anchor) then
         return true
     end
@@ -714,14 +757,20 @@ function M.is_broken(obj, item)
     return false
 end
 
-function M.is_trackable(obj, item, ws)
+function M.is_trackable(obj, item, ws, anchor_part)
     if not obj or not item then
         return false
     end
     if item.map_only then
-        return M.is_map_camera_placed(obj, ws) and not M.is_camera_broken(obj)
+        if not is_valid(obj) or is_pooled(obj) then
+            return false
+        end
+        return not M.is_camera_broken(obj, anchor_part, nil)
     end
-    return M.is_workspace_placed(obj, ws) and not M.is_broken(obj, item)
+    if not M.is_workspace_placed(obj, ws) then
+        return false
+    end
+    return not M.is_broken(obj, item, anchor_part)
 end
 
 function M.find_anchor(obj, item)
@@ -780,17 +829,130 @@ function M.find_anchor(obj, item)
     return nil
 end
 
-function M.camera_status_label(obj, base_label)
+function M.camera_status_label(obj, base_label, cam_part)
     if not is_valid(obj) then
         return base_label
     end
     if get_attr(obj, "Disabled") == true then
         return base_label .. " (OFF)"
     end
-    if M.is_camera_broken(obj) then
+    if M.is_camera_broken(obj, cam_part, nil) then
         return base_label .. " (BROKEN)"
     end
     return base_label
+end
+
+return M
+
+end)()
+
+-- ── game/shootable_gadgets.lua ──
+OperationOne._mods["game.shootable_gadgets"] = (function()
+--[[ Shootable / destroyable gadgets for gadget aimbot + silent gadget aim.
+    Sources: dump/scripts — StateObject Breakable (cameras, placeables) and Drone Humanoid health.
+    Excludes round objectives (Bomb/Defuser) and throwables (grenades).
+]]
+
+local M = {}
+
+-- Workspace model names that bullets can destroy or damage
+M.SHOOTABLE_MODELS = {
+    Drone = true,
+    Claymore = true,
+    RemoteC4 = true,
+    BreachCharge = true,
+    HardBreachCharge = true,
+    SignalDisruptor = true,
+    ProximityAlarm = true,
+    StickyCamera = true,
+    BulletproofCamera = true,
+    DefaultCamera = true,
+    BarbedWire = true,
+    DeployableShield = true,
+    ThermiteCharge = true,
+    ShockBattery = true,
+    IncendiaryCanister = true,
+    NeedleMine = true,
+    ToxicCharge = true,
+}
+
+M.SHOOTABLE_LABELS = {
+    DRONE = true,
+    CLAYMORE = true,
+    C4 = true,
+    BREACH = true,
+    ["HARD BREACH"] = true,
+    JAMMER = true,
+    ["PROX ALARM"] = true,
+    ["STICKY CAM"] = true,
+    ["BP CAM"] = true,
+    ["MAP CAM"] = true,
+    ["BARBED WIRE"] = true,
+    SHIELD = true,
+    THERMITE = true,
+    ["SHOCK BAT"] = true,
+    ["INC CANISTER"] = true,
+    ["NEEDLE MINE"] = true,
+    TOXIC = true,
+}
+
+local function get_attr(inst, name)
+    if not inst or type(inst.GetAttribute) ~= "function" then
+        return nil
+    end
+    return inst:GetAttribute(name)
+end
+
+function M.base_label(label)
+    if not label then
+        return nil
+    end
+    return label:match("^(.-) %(") or label
+end
+
+function M.is_shootable_model(name)
+    return name and M.SHOOTABLE_MODELS[name] == true
+end
+
+function M.is_shootable_label(label)
+    if not label then
+        return false
+    end
+    if M.SHOOTABLE_LABELS[label] then
+        return true
+    end
+    local base = M.base_label(label)
+    return base and M.SHOOTABLE_LABELS[base] == true
+end
+
+function M.is_shootable_item(item)
+    if not item then
+        return false
+    end
+    if M.is_shootable_model(item.name) or M.is_shootable_model(item.model_name) then
+        return true
+    end
+    return M.is_shootable_label(item.label)
+end
+
+function M.is_shootable_entry(w)
+    if not w or w.is_broken then
+        return false
+    end
+
+    local model_name = w.kind or (w.item and (w.item.name or w.item.model_name)) or (w.obj and w.obj.Name)
+    if M.is_shootable_model(model_name) then
+        -- fall through
+    elseif not M.is_shootable_label(w.label) then
+        return false
+    end
+
+    local obj = w.obj
+    if obj and get_attr(obj, "BulletImmune") == true then
+        return false
+    end
+
+    return true
 end
 
 return M
@@ -976,7 +1138,8 @@ M.menu_items = {
     },
     {g = "Combat", t = "checkbox", id = "silent_filter_health", n = "Silent Health Check", v = false, p = "silent_aim_enabled"},
     {g = "Combat", t = "checkbox", id = "silent_filter_visible", n = "Silent Visible Only", v = false, p = "silent_aim_enabled"},
-    {g = "Combat", t = "checkbox", id = "silent_gadget_aim", n = "Silent Gadget Aim", v = false, p = "silent_filter_visible"},
+    {g = "Combat", t = "checkbox", id = "silent_gadget_aim", n = "Silent Gadget Aim", v = false, p = "silent_aim_enabled"},
+    {g = "Combat", t = "checkbox", id = "silent_gadget_team_check", n = "Silent Gadget Team Check", v = false, p = "silent_gadget_aim"},
     {g = "Combat", t = "checkbox", id = "silent_filter_team", n = "Silent Team Check", v = false, p = "silent_aim_enabled"},
     {
         g = "Combat",
@@ -1046,46 +1209,6 @@ M.menu_items = {
         p = "silent_aim_enabled",
         c = {1, 0.25, 0.25, 1}
     },
-    {g = "Combat", t = "separator"},
-    {g = "Combat", t = "label", n = "Gun Mods (GC)"},
-    {g = "Combat", t = "checkbox", id = "gun_mods_enabled", n = "Enable Gun Mods", v = false},
-    {g = "Combat", t = "checkbox", id = "gm_no_recoil", n = "No Recoil", v = false, p = "gun_mods_enabled"},
-    {g = "Combat", t = "checkbox", id = "gm_no_spread", n = "No Spread", v = false, p = "gun_mods_enabled"},
-    {g = "Combat", t = "checkbox", id = "gm_firerate_enabled", n = "Fire Rate", v = false, p = "gun_mods_enabled"},
-    {
-        g = "Combat",
-        t = "slider_int",
-        id = "gm_firerate",
-        n = "Fire Rate (RPM)",
-        min = 400,
-        max = 2000,
-        v = 1200,
-        p = "gm_firerate_enabled"
-    },
-    {g = "Combat", t = "checkbox", id = "gm_speed_enabled", n = "Weapon Swap Speed", v = false, p = "gun_mods_enabled"},
-    {
-        g = "Combat",
-        t = "slider_float",
-        id = "gm_speed_mult",
-        n = "Swap Speed Mult",
-        min = 1.0,
-        max = 1.5,
-        v = 1.2,
-        p = "gm_speed_enabled"
-    },
-    {g = "Combat", t = "checkbox", id = "gm_reload_enabled", n = "Fast Reload", v = false, p = "gun_mods_enabled"},
-    {
-        g = "Combat",
-        t = "slider_float",
-        id = "gm_reload_mult",
-        n = "Reload Speed Mult",
-        min = 1.0,
-        max = 4.0,
-        v = 2.5,
-        p = "gm_reload_enabled"
-    },
-    {g = "Combat", t = "checkbox", id = "gm_accuracy_enabled", n = "Max Accuracy", v = false, p = "gun_mods_enabled"},
-    {g = "Combat", t = "checkbox", id = "gm_ads_enabled", n = "Instant ADS", v = false, p = "gun_mods_enabled"},
     {g = "Players", t = "checkbox", id = "players_enabled", n = "Enable Player Visuals", v = false, k = 0x73, c = {1, 1, 1, 1}},
     {g = "Players", t = "checkbox", id = "players_box", n = "Player Box", v = true, p = "players_enabled"},
     {
@@ -1252,8 +1375,8 @@ M.menu_items = {
         t = "multicombo",
         id = "gadget_aim_blacklist",
         n = "Aimbot Gadget Blacklist",
-        o = {"Drone", "C4", "Claymore", "Jammer", "Sticky Cam", "Breach", "Map Cam", "Hard Breach", "Prox Alarm", "BP Cam"},
-        v = {false, false, false, false, false, false, false, false, false, false},
+        o = {"Drone", "Claymore", "C4", "Jammer", "Sticky Cam", "BP Cam", "Map Cam", "Breach", "Hard Breach", "Prox Alarm", "Barbed Wire", "Shield", "Thermite", "Shock Bat", "Inc Canister", "Needle Mine", "Toxic"},
+        v = {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false},
         p = "utilities_aimbot"
     },
     {g = "World", t = "checkbox", id = "bomb_enabled", n = "Bomb", v = false, p = "world_enabled", c = {1, 0.2, 0.2, 1}},
@@ -2397,6 +2520,7 @@ local draw_util = OperationOne.require("core.draw_util")
 local world_items = OperationOne.require("game.world_items")
 local gadget_team = OperationOne.require("game.gadget_team")
 local gadget_lifecycle = OperationOne.require("game.gadget_lifecycle")
+local shootable_gadgets = OperationOne.require("game.shootable_gadgets")
 
 local M = {}
 
@@ -2508,8 +2632,11 @@ local function get_map_camera_folders(ws)
     return folders
 end
 
-local function should_scan_item(item, s, utilities_active)
+local function should_scan_item(item, s, utilities_active, gadget_aim_active)
     if s[item.enabled] then
+        return true
+    end
+    if gadget_aim_active and shootable_gadgets.is_shootable_item(item) then
         return true
     end
     if utilities_active and TARGETABLE_UTILITIES[item.label] then
@@ -2518,11 +2645,11 @@ local function should_scan_item(item, s, utilities_active)
     return false
 end
 
-local function in_draw_range(dsq, max_sq, hide_sq, dynamic)
+local function in_draw_range(dsq, max_sq, hide_sq, dynamic, for_aim)
     if dsq > max_sq then
         return false
     end
-    if dynamic then
+    if for_aim or dynamic then
         return true
     end
     return dsq > hide_sq
@@ -2547,39 +2674,22 @@ local function add_entry(cache, entry)
     end
 end
 
-local function resolve_position(obj, item, anchor)
-    local pos, sz = get_world_item_position(obj, item)
-    if pos then
-        return pos, sz, anchor or gadget_lifecycle.find_anchor(obj, item)
-    end
-
-    anchor = anchor or gadget_lifecycle.find_anchor(obj, item)
-    if anchor then
-        local x, y, z = unpack_pos(anchor.Position or anchor.position)
-        if x then
-            return {X = x, Y = y, Z = z}, anchor.Size or anchor.size, anchor
-        end
-    end
-
-    return nil, nil, anchor
-end
-
-local function make_entry(obj, item, s, cam_x, cam_y, cam_z, max_sq, hide_sq, sqrt, ws, camera_item)
+local function make_entry(obj, item, s, cam_x, cam_y, cam_z, max_sq, hide_sq, sqrt, ws, camera_item, for_aim)
     local scan_item = camera_item or item
-    if not gadget_lifecycle.is_trackable(obj, scan_item, ws) then
-        return nil
-    end
-
     local anchor = gadget_lifecycle.find_anchor(obj, scan_item)
-    if not anchor then
+    if not anchor or not gadget_lifecycle.is_trackable(obj, scan_item, ws, anchor) then
         return nil
     end
 
-    local pos, sz, resolved_anchor = resolve_position(obj, scan_item, anchor)
+    local pos, sz = get_world_item_position(obj, scan_item)
     if not pos then
-        return nil
+        local x, y, z = unpack_pos(anchor.Position or anchor.position)
+        if not x then
+            return nil
+        end
+        pos = {X = x, Y = y, Z = z}
+        sz = anchor.Size or anchor.size
     end
-    anchor = resolved_anchor or anchor
 
     local px, py, pz = unpack_pos(pos)
     if not px then
@@ -2587,14 +2697,14 @@ local function make_entry(obj, item, s, cam_x, cam_y, cam_z, max_sq, hide_sq, sq
     end
 
     local dsq = dist3d_sq(px, py, pz, cam_x, cam_y, cam_z)
-    local is_dynamic = item and item.dynamic == true
-    if not in_draw_range(dsq, max_sq, hide_sq, is_dynamic) then
+    local is_dynamic = (item and item.dynamic == true) or for_aim
+    if not in_draw_range(dsq, max_sq, hide_sq, is_dynamic, for_aim) then
         return nil
     end
 
     local label = item and item.label or (camera_item and camera_item.label) or obj.Name
     if camera_item then
-        label = gadget_lifecycle.camera_status_label(obj, label)
+        label = gadget_lifecycle.camera_status_label(obj, label, anchor)
     end
 
     local enabled_key = (camera_item and camera_item.enabled) or (item and item.enabled)
@@ -2614,12 +2724,13 @@ local function make_entry(obj, item, s, cam_x, cam_y, cam_z, max_sq, hide_sq, sq
         is_esp = enabled_key and s[enabled_key] == true,
         kind = (camera_item and camera_item.model_name) or (item and item.name),
         dist = sqrt(dsq),
+        dsq = dsq,
         key = M.inst_key(obj),
         dynamic = item and item.dynamic == true,
         static = (item and item.static == true) or (camera_item and camera_item.static == true),
         map_only = camera_item and camera_item.map_only == true,
         is_teammate_gadget = gadget_team.is_friendly_gadget(obj),
-        is_broken = gadget_lifecycle.is_broken(obj, scan_item),
+        is_broken = gadget_lifecycle.is_broken(obj, scan_item, anchor),
     }
 end
 
@@ -2645,10 +2756,11 @@ function M.get_max_sq(s, utilities_active)
     return max_dist * max_dist
 end
 
-function M.sync_workspace(ws, s, utilities_active, cache, cam_x, cam_y, cam_z, hide_sq, sqrt)
+function M.sync_workspace(ws, s, utilities_active, cache, cam_x, cam_y, cam_z, hide_sq, sqrt, gadget_aim_active)
     local seen = {}
-    local max_sq = M.get_max_sq(s, utilities_active)
+    local max_sq = M.get_max_sq(s, utilities_active or gadget_aim_active)
     local lookup = world_items.world_items_by_name
+    local for_aim = gadget_aim_active == true
 
     if not is_valid(ws) then
         return
@@ -2656,18 +2768,13 @@ function M.sync_workspace(ws, s, utilities_active, cache, cam_x, cam_y, cam_z, h
 
     for _, child in ipairs(ws:GetChildren()) do
         local item = lookup[child.Name]
-        if item and should_scan_item(item, s, utilities_active) then
-            if gadget_lifecycle.is_trackable(child, item, ws) then
+        if item and should_scan_item(item, s, utilities_active, gadget_aim_active) then
+            if is_valid(child) then
                 local key = M.inst_key(child)
                 if key then
                     seen[key] = true
-                    local entry = cache.world_lookup[key]
-                    if entry then
-                        M.refresh_flags(entry, s)
-                        entry.is_teammate_gadget = gadget_team.is_friendly_gadget(child)
-                        entry.is_broken = gadget_lifecycle.is_broken(child, item)
-                    else
-                        entry = make_entry(child, item, s, cam_x, cam_y, cam_z, max_sq, hide_sq, sqrt, ws, nil)
+                    if not cache.world_lookup[key] then
+                        local entry = make_entry(child, item, s, cam_x, cam_y, cam_z, max_sq, hide_sq, sqrt, ws, nil, for_aim)
                         if entry then
                             add_entry(cache, entry)
                         end
@@ -2680,14 +2787,15 @@ function M.sync_workspace(ws, s, utilities_active, cache, cam_x, cam_y, cam_z, h
     prune_entries(cache, function(w)
         return w.item and w.item.name and not w.map_only
     end, function(obj, item)
-        return gadget_lifecycle.is_trackable(obj, item, ws)
+        return gadget_lifecycle.is_trackable(obj, item, ws, nil)
     end, seen)
 end
 
-function M.sync_map_cameras(ws, s, utilities_active, cache, cam_x, cam_y, cam_z, hide_sq, sqrt)
+function M.sync_map_cameras(ws, s, utilities_active, cache, cam_x, cam_y, cam_z, hide_sq, sqrt, gadget_aim_active)
     local seen = {}
-    local max_sq = M.get_max_sq(s, utilities_active)
+    local max_sq = M.get_max_sq(s, utilities_active or gadget_aim_active)
     local default_camera = world_items.camera_items_by_name.DefaultCamera
+    local for_aim = gadget_aim_active == true
 
     if not default_camera then
         return
@@ -2695,6 +2803,7 @@ function M.sync_map_cameras(ws, s, utilities_active, cache, cam_x, cam_y, cam_z,
 
     local enabled = s[default_camera.enabled]
         or (utilities_active and TARGETABLE_UTILITIES["MAP CAM"])
+        or (gadget_aim_active and shootable_gadgets.is_shootable_item(default_camera))
 
     if not enabled then
         for i = #cache.world, 1, -1 do
@@ -2711,20 +2820,13 @@ function M.sync_map_cameras(ws, s, utilities_active, cache, cam_x, cam_y, cam_z,
         if is_valid(folder) then
             for _, child in ipairs(folder:GetChildren()) do
                 if is_valid(child) and child.Name == "DefaultCamera" then
-                    if gadget_lifecycle.is_trackable(child, default_camera, ws) then
-                        local key = M.inst_key(child)
-                        if key then
-                            seen[key] = true
-                            local entry = cache.world_lookup[key]
+                    local key = M.inst_key(child)
+                    if key then
+                        seen[key] = true
+                        if not cache.world_lookup[key] then
+                            local entry = make_entry(child, nil, s, cam_x, cam_y, cam_z, max_sq, hide_sq, sqrt, ws, default_camera, for_aim)
                             if entry then
-                                M.refresh_flags(entry, s)
-                                entry.is_broken = gadget_lifecycle.is_broken(child, default_camera)
-                                entry.label = gadget_lifecycle.camera_status_label(child, default_camera.label)
-                            else
-                                entry = make_entry(child, nil, s, cam_x, cam_y, cam_z, max_sq, hide_sq, sqrt, ws, default_camera)
-                                if entry then
-                                    add_entry(cache, entry)
-                                end
+                                add_entry(cache, entry)
                             end
                         end
                     end
@@ -2735,78 +2837,95 @@ function M.sync_map_cameras(ws, s, utilities_active, cache, cam_x, cam_y, cam_z,
 
     prune_entries(cache, function(w)
         return w.map_only == true
-    end, function(obj)
-        return gadget_lifecycle.is_trackable(obj, default_camera, ws)
+    end, function(obj, item)
+        return gadget_lifecycle.is_map_camera_placed(obj, ws)
+            and not gadget_lifecycle.is_camera_broken(obj, nil, nil)
     end, seen)
 end
 
-function M.refresh_workspace_entry(entry, cam_x, cam_y, cam_z, sqrt, ws)
-    if not entry or entry.map_only then
-        return false
-    end
-    if not gadget_lifecycle.is_trackable(entry.obj, entry.item, ws) then
+function M.refresh_entry_position(entry, cam_x, cam_y, cam_z, sqrt)
+    if not entry or not entry.obj or not is_valid(entry.obj) then
         return false
     end
 
-    local anchor = gadget_lifecycle.find_anchor(entry.obj, entry.item)
-    if not anchor then
-        return false
+    local anchor = entry.anchor
+    if not anchor or not is_valid(anchor) then
+        anchor = gadget_lifecycle.find_anchor(entry.obj, entry.item)
+        if not anchor then
+            return false
+        end
+        entry.anchor = anchor
     end
 
-    local pos, _, resolved_anchor = resolve_position(entry.obj, entry.item, anchor)
-    if not pos then
-        return false
+    local x, y, z
+    if entry.map_only then
+        x, y, z = unpack_pos(anchor.Position or anchor.position)
+    else
+        local pos = get_world_item_position(entry.obj, entry.item)
+        if pos then
+            x, y, z = unpack_pos(pos)
+        else
+            x, y, z = unpack_pos(anchor.Position or anchor.position)
+        end
     end
-    anchor = resolved_anchor or anchor
 
-    local x, y, z = unpack_pos(pos)
     if not x then
         return false
     end
 
-    entry.anchor = anchor
     entry.x = x
     entry.y = y
     entry.z = z
-    entry.dist = sqrt(dist3d_sq(x, y, z, cam_x, cam_y, cam_z))
-    entry.bbox = gadget_bbox(entry.item, anchor)
-    entry.is_teammate_gadget = gadget_team.is_friendly_gadget(entry.obj)
-    entry.is_broken = gadget_lifecycle.is_broken(entry.obj, entry.item)
+    local dsq = dist3d_sq(x, y, z, cam_x, cam_y, cam_z)
+    entry.dsq = dsq
+    entry.dist = sqrt(dsq)
+
+    if entry.dynamic or entry.map_only then
+        entry.bbox = gadget_bbox(entry.item, anchor)
+    end
     return true
 end
 
-function M.refresh_map_camera_entry(entry, cam_x, cam_y, cam_z, sqrt, ws)
-    if not entry or not entry.map_only then
-        return false
+function M.refresh_positions(cache, cam_x, cam_y, cam_z, sqrt, only_dynamic)
+    for i = 1, #cache.world do
+        local w = cache.world[i]
+        if not only_dynamic or w.dynamic then
+            M.refresh_entry_position(w, cam_x, cam_y, cam_z, sqrt)
+        end
     end
-
-    local camera_item = entry.item or world_items.camera_items_by_name.DefaultCamera
-    if not camera_item or not gadget_lifecycle.is_trackable(entry.obj, camera_item, ws) then
-        return false
-    end
-
-    local anchor = gadget_lifecycle.find_anchor(entry.obj, camera_item)
-    if not anchor then
-        return false
-    end
-
-    local x, y, z = unpack_pos(anchor.Position or anchor.position)
-    if not x then
-        return false
-    end
-
-    entry.anchor = anchor
-    entry.x = x
-    entry.y = y
-    entry.z = z
-    entry.dist = sqrt(dist3d_sq(x, y, z, cam_x, cam_y, cam_z))
-    entry.bbox = bbox_from_part(anchor)
-    entry.is_broken = gadget_lifecycle.is_broken(entry.obj, camera_item)
-    entry.label = gadget_lifecycle.camera_status_label(entry.obj, camera_item.label)
-    return true
 end
 
-function M.refresh_flags(entry, s)
+function M.prune_lifecycle(cache, ws, refresh_team)
+    for i = #cache.world, 1, -1 do
+        local w = cache.world[i]
+        local item = w.item
+        local anchor = w.anchor
+        if not is_valid(w.obj) or not gadget_lifecycle.is_trackable(w.obj, item, ws, anchor) then
+            remove_entry(cache, w)
+            table.remove(cache.world, i)
+        else
+            w.is_broken = gadget_lifecycle.is_broken(w.obj, item, anchor)
+            if w.map_only and item then
+                w.label = gadget_lifecycle.camera_status_label(w.obj, item.label, anchor)
+            end
+            if refresh_team then
+                w.is_teammate_gadget = gadget_team.is_friendly_gadget(w.obj)
+            end
+        end
+    end
+end
+
+function M.refresh_flags(cache_or_entry, s)
+    local entries = cache_or_entry
+    if cache_or_entry and cache_or_entry.world then
+        entries = cache_or_entry.world
+        for i = 1, #entries do
+            M.refresh_flags(entries[i], s)
+        end
+        return
+    end
+
+    local entry = cache_or_entry
     if entry.map_only and entry.item then
         entry.is_esp = s[entry.item.enabled] == true
         entry.color = s[entry.item.color_key .. "_color"] or entry.color
@@ -2815,23 +2934,6 @@ function M.refresh_flags(entry, s)
     if entry.item and entry.item.enabled then
         entry.is_esp = s[entry.item.enabled] == true
         entry.color = s[entry.item.enabled .. "_color"] or entry.color
-    end
-end
-
-function M.refresh_all(cache, cam_x, cam_y, cam_z, sqrt, ws)
-    ws = ws or cache.ws
-    for i = #cache.world, 1, -1 do
-        local w = cache.world[i]
-        local ok
-        if w.map_only then
-            ok = M.refresh_map_camera_entry(w, cam_x, cam_y, cam_z, sqrt, ws)
-        else
-            ok = M.refresh_workspace_entry(w, cam_x, cam_y, cam_z, sqrt, ws)
-        end
-        if not ok then
-            remove_entry(cache, w)
-            table.remove(cache.world, i)
-        end
     end
 end
 
@@ -2983,6 +3085,97 @@ return M
 
 end)()
 
+-- ── core/vis_util.lua ──
+OperationOne._mods["core.vis_util"] = (function()
+--[[ Line-of-sight helpers — raycast.cast (fail-closed) with gadget target matching. ]]
+
+local silent_ray = OperationOne.require("core.silent_ray")
+
+local M = {}
+
+function M.part_of(inst, root)
+    if not inst or not root then
+        return false
+    end
+    local p = inst
+    while p do
+        if p == root then
+            return true
+        end
+        p = p.Parent or p.parent
+    end
+    return false
+end
+
+function M.ray_origin()
+    local o = silent_ray.get_camera_origin()
+    if o then
+        return o.x, o.y, o.z
+    end
+    return nil
+end
+
+function M.aim_point(entry)
+    if not entry then
+        return nil
+    end
+    local anchor = entry.anchor
+    if anchor and anchor.Position then
+        local p = anchor.Position
+        return p.X or p.x, p.Y or p.y, p.Z or p.z
+    end
+    if entry.x then
+        return entry.x, entry.y, entry.z
+    end
+    return nil
+end
+
+function M.can_see_world_point(tx, ty, tz, target_root)
+    if not raycast then
+        return true
+    end
+    if raycast.is_ready and not raycast.is_ready() then
+        return false
+    end
+
+    local ox, oy, oz = M.ray_origin()
+    if not ox or not tx then
+        return false
+    end
+
+    if raycast.cast then
+        local hit, _, _, inst = raycast.cast(ox, oy, oz, tx, ty, tz)
+        if not hit then
+            return true
+        end
+        if target_root and inst and M.part_of(inst, target_root) then
+            return true
+        end
+        return false
+    end
+
+    if raycast.is_visible then
+        return raycast.is_visible(ox, oy, oz, tx, ty, tz) == true
+    end
+
+    return true
+end
+
+function M.can_see_entry(entry)
+    if not entry then
+        return false
+    end
+    local tx, ty, tz = M.aim_point(entry)
+    if not tx then
+        return false
+    end
+    return M.can_see_world_point(tx, ty, tz, entry.obj)
+end
+
+return M
+
+end)()
+
 -- ── features/combat/silent_resolve.lua ──
 OperationOne._mods["features.combat.silent_resolve"] = (function()
 --[[ Silent ray origin — camera to target (Operation One hitscan). ]]
@@ -3002,205 +3195,6 @@ function M.resolve_track(aim)
     end
 
     return camera, aim
-end
-
-return M
-
-end)()
-
--- ── game/gc_weapon_mods.lua ──
-OperationOne._mods["game.gc_weapon_mods"] = (function()
---[[ Operation One weapon mods — refreshgc → getgc(keys) → applygc(keys, values) ]]
-
-local debug = OperationOne.require("core.debug")
-local env = OperationOne.require("core.env")
-
-local M = {}
-
-M.WEAPON_STAT_KEYS = {
-    "recoil_up",
-    "recoil_side",
-    "spread",
-    "accuracy",
-    "firerate",
-    "reload_speed",
-    "ads",
-    "speed",
-}
-
-M.WEAPON_FIND_KEYS = {
-    "recoil_up",
-    "recoil_side",
-    "spread",
-    "accuracy",
-    "firerate",
-    "reload_speed",
-    "ads",
-    "speed",
-    "trail_size",
-    "pellets",
-    "zoom",
-    "mag_size",
-    "damage",
-    "range",
-    "destructive",
-}
-
-M.ALLOWED = {}
-for _, key in ipairs(M.WEAPON_STAT_KEYS) do
-    M.ALLOWED[key] = true
-end
-
-M._last_node_count = 0
-
-local function has_api()
-    return type(refreshgc) == "function"
-        and type(getgc) == "function"
-        and type(applygc) == "function"
-end
-
-function M.available()
-    return has_api()
-end
-
-function M.last_node_count()
-    return M._last_node_count
-end
-
-function M.in_game()
-    if env.get_local_player() ~= nil then
-        return true
-    end
-    local ws = env.get_workspace()
-    return ws ~= nil and ws:FindFirstChild("Viewmodels") ~= nil
-end
-
-local function sanitize_payload(mods)
-    local out = {}
-    for k, v in pairs(mods) do
-        if M.ALLOWED[k] and v ~= nil then
-            local num = tonumber(v)
-            if num ~= nil then
-                out[k] = num
-            end
-        end
-    end
-    return out
-end
-
-local function keys_for_payload(payload)
-    local keys = {}
-    for k in pairs(payload) do
-        keys[#keys + 1] = k
-    end
-    table.sort(keys)
-    return keys
-end
-
-local function warm_nodes(keys)
-    local count = 0
-    local ok, result = pcall(getgc, keys)
-    if ok and type(result) == "number" then
-        count = result
-    end
-    if count <= 0 then
-        ok, result = pcall(getgc, M.WEAPON_FIND_KEYS)
-        if ok and type(result) == "number" then
-            count = result
-        end
-    end
-    return count
-end
-
-local function patch_count(keys, payload)
-    local patched = 0
-
-    local ok, result = pcall(applygc, keys, payload)
-    if ok and type(result) == "number" then
-        patched = result
-    end
-
-    if patched <= 0 then
-        ok, result = pcall(applygc, M.WEAPON_FIND_KEYS, payload)
-        if ok and type(result) == "number" then
-            patched = result
-        end
-    end
-
-    if patched <= 0 then
-        ok, result = pcall(applygc, payload)
-        if ok and type(result) == "number" then
-            patched = result
-        end
-    end
-
-    return patched
-end
-
-function M.apply_weapon(mods, _quiet)
-    if not has_api() then
-        return false, 0, "GC API unavailable"
-    end
-
-    local payload = sanitize_payload(mods)
-    if not next(payload) then
-        return false, 0, "No modifiers selected"
-    end
-
-    if not M.in_game() then
-        return false, 0, "Enter a match first"
-    end
-
-    pcall(refreshgc)
-
-    local patch_keys = keys_for_payload(payload)
-    warm_nodes(M.WEAPON_FIND_KEYS)
-    warm_nodes(patch_keys)
-
-    local patched = patch_count(patch_keys, payload)
-    M._last_node_count = math.max(M._last_node_count, patched, warm_nodes(patch_keys))
-
-    if patched > 0 then
-        return true, patched, string.format("%d node(s) patched", patched)
-    end
-
-    debug.warn_once("gun_mods:nodes", "GC warming — enable master + a mod, wait a moment")
-    return false, 0, "GC warming — wait a moment"
-end
-
-function M.apply(mods)
-    return M.apply_weapon(mods)
-end
-
-function M.refresh_cache()
-    if not has_api() or not M.in_game() then
-        M._last_node_count = 0
-        return 0
-    end
-
-    pcall(refreshgc)
-    warm_nodes(M.WEAPON_FIND_KEYS)
-    local count = warm_nodes(M.WEAPON_STAT_KEYS)
-    M._last_node_count = count
-    return count
-end
-
-function M.dump_keys(path)
-    if type(dumpgc) ~= "function" then
-        return false, 0, "dumpgc unavailable"
-    end
-    local ok, result = pcall(dumpgc, M.WEAPON_FIND_KEYS, path or "op_one_gc_dump.txt")
-    if ok and type(result) == "number" then
-        return true, result, "Dumped " .. result .. " entries"
-    end
-    return false, 0, "dumpgc failed"
-end
-
-function M.status_text()
-    if not has_api() then
-        return "GC: unavailable"
-    end
-    return string.format("GC nodes: %d", M._last_node_count)
 end
 
 return M
@@ -3388,6 +3382,8 @@ local settings = OperationOne.require("core.settings")
 local cache = OperationOne.require("core.cache")
 local world_scan = OperationOne.require("game.world_scan")
 local draw_util = OperationOne.require("core.draw_util")
+local shootable_gadgets = OperationOne.require("game.shootable_gadgets")
+local vis_util = OperationOne.require("core.vis_util")
 
 local sqrt, min, max = constants.sqrt, constants.min, constants.max
 local DIST = constants.DIST
@@ -3404,8 +3400,14 @@ local project_bbox_screen = draw_util.project_bbox_screen
 local last_char_update = 0
 local last_player_discover = 0
 local last_world_static = 0
+local last_ws_sync = 0
+local last_map_sync = 0
+local last_lifecycle = 0
+local last_world_flags = 0
 local PLAYER_DISCOVER_MS = 200
 local WORLD_STATIC_MS = 2500
+local WORLD_LIFECYCLE_MS = 150
+local WORLD_FLAGS_MS = 100
 
 local function tick_ms()
     return utility and utility.get_tick_count and utility.get_tick_count() or 0
@@ -3729,6 +3731,25 @@ local function update_visibility(cam_x, cam_y, cam_z)
     end
 end
 
+local function update_gadget_visibility()
+    local need_gadget_vis = s.silent_filter_visible and s.silent_aim_enabled and s.silent_gadget_aim
+    if not need_gadget_vis then
+        for i = 1, #cache.world do
+            cache.world[i].is_visible = nil
+        end
+        return
+    end
+
+    for i = 1, #cache.world do
+        local w = cache.world[i]
+        if shootable_gadgets.is_shootable_entry(w) then
+            w.is_visible = vis_util.can_see_entry(w)
+        else
+            w.is_visible = nil
+        end
+    end
+end
+
 function M.scan_players()
     if not M.needs_player_scan() then
         for i = #cache.players, 1, -1 do
@@ -3792,12 +3813,13 @@ local TARGETABLE_UTILITIES = {
 
 function M.needs_world_scan()
     local utilities_active = s.aimbot_enabled and s.utilities_aimbot
-    local silent_gadgets = s.silent_aim_enabled and s.silent_filter_visible and s.silent_gadget_aim
+    local silent_gadgets = s.silent_aim_enabled and s.silent_gadget_aim
     return s.world_enabled or utilities_active or silent_gadgets
 end
 
 function M.scan_world()
     local utilities_active = s.aimbot_enabled and s.utilities_aimbot
+    local silent_gadgets = s.silent_aim_enabled and s.silent_gadget_aim
     if not cache.ws or not M.needs_world_scan() then
         cache.world = {}
         cache.world_lookup = {}
@@ -3806,27 +3828,48 @@ function M.scan_world()
 
     local now = tick_ms()
     local cam_x, cam_y, cam_z = cache.cam_x, cache.cam_y, cache.cam_z
+    local needs_fast = utilities_active or silent_gadgets
+    local gadget_aim_active = needs_fast
 
-    for i = 1, #cache.world do
-        world_scan.refresh_flags(cache.world[i], s)
+    if now - last_world_flags >= WORLD_FLAGS_MS then
+        last_world_flags = now
+        world_scan.refresh_flags(cache, s)
     end
 
-    world_scan.refresh_all(cache, cam_x, cam_y, cam_z, sqrt, cache.ws)
-
-    world_scan.sync_workspace(
-        cache.ws, s, utilities_active, cache,
-        cam_x, cam_y, cam_z, DIST.ESP_HIDE_SQ, sqrt
-    )
-
-    world_scan.sync_map_cameras(
-        cache.ws, s, utilities_active, cache,
-        cam_x, cam_y, cam_z, DIST.ESP_HIDE_SQ, sqrt
-    )
-
-    if now - last_world_static >= WORLD_STATIC_MS then
-        last_world_static = now
-        cache.stats.last_world_scan = now
+    if cache.should_refresh_positions() then
+        world_scan.refresh_positions(cache, cam_x, cam_y, cam_z, sqrt, false)
+    elseif needs_fast then
+        world_scan.refresh_positions(cache, cam_x, cam_y, cam_z, sqrt, true)
     end
+
+    if now - last_lifecycle >= WORLD_LIFECYCLE_MS then
+        last_lifecycle = now
+        world_scan.prune_lifecycle(cache, cache.ws, s.world_team_check or s.silent_gadget_team_check)
+    end
+
+    local ws_interval = (s.world_enabled or needs_fast) and cache.WORLD_DYNAMIC_MS or cache.WORKSPACE_SCAN_MS
+    if now - last_ws_sync >= ws_interval then
+        last_ws_sync = now
+        world_scan.sync_workspace(
+            cache.ws, s, utilities_active, cache,
+            cam_x, cam_y, cam_z, DIST.ESP_HIDE_SQ, sqrt, gadget_aim_active
+        )
+    end
+
+    local map_interval = gadget_aim_active and cache.WORLD_DYNAMIC_MS or cache.WORLD_STATIC_MS
+    if now - last_map_sync >= map_interval then
+        last_map_sync = now
+        world_scan.sync_map_cameras(
+            cache.ws, s, utilities_active, cache,
+            cam_x, cam_y, cam_z, DIST.ESP_HIDE_SQ, sqrt, gadget_aim_active
+        )
+        if now - last_world_static >= WORLD_STATIC_MS then
+            last_world_static = now
+            cache.stats.last_world_scan = now
+        end
+    end
+
+    update_gadget_visibility()
 end
 
 return M
@@ -3839,6 +3882,7 @@ local constants = OperationOne.require("core.constants")
 local settings = OperationOne.require("core.settings")
 local cache = OperationOne.require("core.cache")
 local draw_util = OperationOne.require("core.draw_util")
+local shootable_gadgets = OperationOne.require("game.shootable_gadgets")
 
 local sqrt = constants.sqrt
 local AIM_TARGET = constants.AIM_TARGET
@@ -4019,37 +4063,28 @@ function M.process_aimbot()
         if s.aimbot_players_priority and best and not best.target.is_utility then
             -- player already locked — don't consider gadgets
         else
-        local tu = {
-            DRONE = true,
-            C4 = true,
-            CLAYMORE = true,
-            JAMMER = true,
-            STICKY = true,
-            ["STICKY CAM"] = true,
-            BREACH = true,
-            CAMERA = true,
-            ["MAP CAM"] = true,
-            ["HARD BREACH"] = true,
-            ["PROX ALARM"] = true,
-            ["BP CAMERA"] = true,
-            ["BP CAM"] = true,
-        }
         local bl_opts = s.gadget_aim_blacklist or {}
         local bl_labels = {
-            "DRONE", "C4", "CLAYMORE", "JAMMER", "STICKY CAM", "BREACH",
-            "MAP CAM", "HARD BREACH", "PROX ALARM", "BP CAM",
+            "DRONE", "CLAYMORE", "C4", "JAMMER", "STICKY CAM", "BP CAM", "MAP CAM", "BREACH",
+            "HARD BREACH", "PROX ALARM", "BARBED WIRE", "SHIELD",
+            "THERMITE", "SHOCK BAT", "INC CANISTER", "NEEDLE MINE", "TOXIC",
         }
         local aim_blacklist = {}
         for i, enabled in ipairs(bl_opts) do
             if enabled and bl_labels[i] then
                 aim_blacklist[bl_labels[i]] = true
+                local base = shootable_gadgets.base_label(bl_labels[i])
+                if base and base ~= bl_labels[i] then
+                    aim_blacklist[base] = true
+                end
             end
         end
         for _, w in ipairs(cache.world) do
-            if w.dist <= s.utilities_max_distance and tu[w.label] and not aim_blacklist[w.label] then
-                if w.is_broken then
-                    goto continue_gadget
-                end
+            if w.dist <= s.utilities_max_distance
+                and shootable_gadgets.is_shootable_entry(w)
+                and not aim_blacklist[w.label]
+                and not aim_blacklist[shootable_gadgets.base_label(w.label)]
+            then
                 if s.world_team_check and w.is_teammate_gadget then
                     goto continue_gadget
                 end
@@ -4134,6 +4169,7 @@ local settings = OperationOne.require("core.settings")
 local cache = OperationOne.require("core.cache")
 local silent_ray = OperationOne.require("core.silent_ray")
 local silent_resolve = OperationOne.require("features.combat.silent_resolve")
+local shootable_gadgets = OperationOne.require("game.shootable_gadgets")
 
 local sqrt = constants.sqrt
 local AIM_TARGET = constants.AIM_TARGET
@@ -4147,28 +4183,12 @@ local last_target_scan = 0
 local weapon_hold_ticks = 0
 local bone_map = {[0] = "head", [1] = "torso", [2] = "arm1", [3] = "arm2", [4] = "leg1", [5] = "leg2"}
 
-local TARGETABLE_UTILITIES = {
-    DRONE = true,
-    C4 = true,
-    CLAYMORE = true,
-    JAMMER = true,
-    STICKY = true,
-    ["STICKY CAM"] = true,
-    BREACH = true,
-    CAMERA = true,
-    ["MAP CAM"] = true,
-    ["HARD BREACH"] = true,
-    ["PROX ALARM"] = true,
-    ["BP CAMERA"] = true,
-    ["BP CAM"] = true,
-    FLASH = true,
-    STUN = true,
-    FRAG = true,
-    SMOKE = true,
-    EMP = true,
-    IMPACT = true,
-    INCENDIARY = true,
-}
+local function silent_vis_enabled()
+    if menu and menu.get then
+        return menu.get("silent_filter_visible") == true
+    end
+    return s.silent_filter_visible == true
+end
 
 local function tick_ms()
     return utility and utility.get_tick_count and utility.get_tick_count() or 0
@@ -4279,33 +4299,23 @@ local function get_bone_pos(p)
     return apply_prediction(pos, p)
 end
 
-local function gadget_visible(w)
-    if not w then
-        return false
-    end
-    if not raycast or not raycast.is_visible then
-        return true
-    end
-    return raycast.is_visible(cache.cam_x, cache.cam_y, cache.cam_z, w.x, w.y, w.z)
-end
-
 local function passes_gadget_filters(w)
     if not w or not w.x then
         return false
     end
-    if not TARGETABLE_UTILITIES[w.label] then
+    if not shootable_gadgets.is_shootable_entry(w) then
         return false
     end
     if w.dist > (s.silent_max_dist or 250) then
         return false
     end
-    if w.is_broken then
+    if s.silent_gadget_team_check and w.is_teammate_gadget then
         return false
     end
-    if s.world_team_check and w.is_teammate_gadget then
+    if silent_vis_enabled() and w.is_visible ~= true then
         return false
     end
-    return gadget_visible(w)
+    return true
 end
 
 local function get_gadget_aim(entry)
@@ -4427,7 +4437,7 @@ local function find_target(cx, cy, fov)
         end
     end
 
-    if s.silent_filter_visible and s.silent_gadget_aim then
+    if s.silent_gadget_aim then
         for _, w in ipairs(cache.world) do
             local score = score_gadget(w, cx, cy, fov)
             if score and score < best_score then
@@ -4558,262 +4568,6 @@ function M.draw()
             end
         end
     end
-end
-
-return M
-
-end)()
-
--- ── features/combat/gun_mods.lua ──
-OperationOne._mods["features.combat.gun_mods"] = (function()
-local settings = OperationOne.require("core.settings")
-local gc = OperationOne.require("game.gc_weapon_mods")
-
-local M = {}
-
-local s = settings.s
-local RETRY_MS = 750
-local RETRY_MAX_MS = 30000
-
-M._apply_dirty = false
-M._force_apply = false
-M._defer_until = 0
-M._retry_until = 0
-M._was_enabled = false
-M._status = "GC: idle"
-M._logged_apply = false
-M._callbacks_ready = false
-M._last_mod_sig = ""
-
-local MOD_IDS = {
-    "gm_no_recoil",
-    "gm_no_spread",
-    "gm_firerate_enabled",
-    "gm_speed_enabled",
-    "gm_reload_enabled",
-    "gm_accuracy_enabled",
-    "gm_ads_enabled",
-    "gm_firerate",
-    "gm_speed_mult",
-    "gm_reload_mult",
-}
-
-local function tick_ms()
-    return utility and utility.get_tick_count and utility.get_tick_count() or 0
-end
-
-local function build_mods()
-    local mods = {}
-
-    if s.gm_no_recoil then
-        mods.recoil_up = 0
-        mods.recoil_side = 0
-    end
-
-    if s.gm_no_spread then
-        mods.spread = 0
-    end
-
-    if s.gm_firerate_enabled then
-        mods.firerate = s.gm_firerate or 1200
-    end
-
-    if s.gm_speed_enabled then
-        mods.speed = s.gm_speed_mult or 1.2
-    end
-
-    if s.gm_reload_enabled then
-        mods.reload_speed = s.gm_reload_mult or 2.5
-    end
-
-    if s.gm_accuracy_enabled then
-        mods.accuracy = 25
-    end
-
-    if s.gm_ads_enabled then
-        mods.ads = 0
-    end
-
-    return mods
-end
-
-local function payload_signature(mods)
-    local keys = {}
-    for k in pairs(mods) do
-        keys[#keys + 1] = k
-    end
-    table.sort(keys)
-    local parts = {}
-    for i, k in ipairs(keys) do
-        parts[i] = k .. "=" .. tostring(mods[k])
-    end
-    return table.concat(parts, ";")
-end
-
-local function has_active_mods()
-    return s.gm_no_recoil
-        or s.gm_no_spread
-        or s.gm_firerate_enabled
-        or s.gm_speed_enabled
-        or s.gm_reload_enabled
-        or s.gm_accuracy_enabled
-        or s.gm_ads_enabled
-end
-
-function M.schedule_apply(delay_ms)
-    M._apply_dirty = true
-    M._force_apply = true
-    local now = tick_ms()
-    local until_ms = now + (delay_ms or 400)
-    if until_ms > M._defer_until then
-        M._defer_until = until_ms
-    end
-    if M._retry_until <= now then
-        M._retry_until = now + RETRY_MAX_MS
-    end
-end
-
-function M.try_apply(silent)
-    if not s.gun_mods_enabled or not has_active_mods() then
-        M._status = "GC: off"
-        M._apply_dirty = false
-        M._force_apply = false
-        return false
-    end
-
-    local mods = build_mods()
-    if not next(mods) then
-        return false
-    end
-
-    if not M._force_apply and not M._apply_dirty then
-        M._status = gc.status_text()
-        return true
-    end
-
-    local ok, count, msg = gc.apply_weapon(mods, silent)
-    if ok then
-        M._apply_dirty = false
-        M._force_apply = false
-        M._defer_until = 0
-        M._retry_until = 0
-        M._status = gc.status_text()
-        if not silent and not M._logged_apply then
-            M._logged_apply = true
-            print("[OperationOne] Gun mods: " .. (msg or (count .. " nodes patched")))
-        end
-        return true
-    end
-
-    M._status = msg or "GC: warming"
-    M._apply_dirty = true
-    M._force_apply = true
-    M._defer_until = tick_ms() + RETRY_MS
-    return false
-end
-
-local function on_mod_changed()
-    if s.gun_mods_enabled then
-        M.schedule_apply(150)
-    end
-end
-
-function M.register_callbacks()
-    if M._callbacks_ready then
-        return
-    end
-
-    settings.on_change("gun_mods_enabled", function(enabled)
-        if enabled then
-            gc.refresh_cache()
-            M._logged_apply = false
-            M.schedule_apply(500)
-            print("[OperationOne] Gun mods enabled — warming GC...")
-        else
-            M._apply_dirty = false
-            M._force_apply = false
-            M._defer_until = 0
-            M._retry_until = 0
-            M._status = "GC: off"
-            M._logged_apply = false
-        end
-    end)
-
-    for _, id in ipairs(MOD_IDS) do
-        settings.on_change(id, on_mod_changed)
-    end
-
-    M._callbacks_ready = true
-end
-
-function M.update(_dt)
-    local enabled = s.gun_mods_enabled and has_active_mods()
-
-    if enabled and not M._was_enabled then
-        gc.refresh_cache()
-        M._logged_apply = false
-        M.schedule_apply(500)
-    elseif not enabled and M._was_enabled then
-        M._apply_dirty = false
-        M._force_apply = false
-        M._status = "GC: off"
-        M._logged_apply = false
-    end
-
-    M._was_enabled = enabled
-
-    if not s.gun_mods_enabled then
-        return
-    end
-
-    local mods = build_mods()
-    local sig = payload_signature(mods)
-    if sig ~= M._last_mod_sig then
-        M._last_mod_sig = sig
-        if has_active_mods() then
-            M.schedule_apply(150)
-        end
-    end
-
-    if not has_active_mods() then
-        M._apply_dirty = false
-        M._force_apply = false
-        return
-    end
-
-    local now = tick_ms()
-
-    if not M._apply_dirty then
-        return
-    end
-
-    if now < M._defer_until then
-        return
-    end
-
-    if M._retry_until > 0 and now > M._retry_until then
-        M._apply_dirty = false
-        M._force_apply = false
-        M._status = "GC: timeout — toggle mods again"
-        return
-    end
-
-    M.try_apply(true)
-end
-
-function M.get_status()
-    return M._status
-end
-
-function M.register_menu()
-    local menu_util = OperationOne.require("core.menu_util")
-    local gc_mod = OperationOne.require("game.gc_weapon_mods")
-    menu_util.ensure_groups()
-    menu.add_button(menu_util.TAB, "Combat", "gm_dump_gc", "Dump GC Keys", function()
-        local ok, count, msg = gc_mod.dump_keys("op_one_gc_dump.txt")
-        print("[OperationOne] " .. (msg or (ok and "dump ok" or "dump failed")) .. " (" .. tostring(count) .. ")")
-    end, { parent = "gun_mods_enabled" })
-    M.register_callbacks()
 end
 
 return M
@@ -5071,14 +4825,18 @@ function M.render_world()
         end
 
         if w.x then
-            local dsq = dist3d_sq(w.x, w.y, w.z, cam_x, cam_y, cam_z)
+            local dsq = w.dsq
+            if not dsq then
+                dsq = dist3d_sq(w.x, w.y, w.z, cam_x, cam_y, cam_z)
+                w.dsq = dsq
+                w.dist = math.sqrt(dsq)
+            end
             if dsq > max_sq then
                 goto continue
             end
             if not w.dynamic and dsq <= DIST.ESP_HIDE_SQ then
                 goto continue
             end
-            w.dist = math.sqrt(dsq)
         end
 
         if show_box then
@@ -5270,9 +5028,6 @@ local function draw_keybind_window()
     if s.silent_aim_enabled then
         itms[#itms + 1] = "Silent Aim: ON"
     end
-    if s.gun_mods_enabled then
-        itms[#itms + 1] = "Gun Mods: ON"
-    end
     if #itms > 0 then
         draw.window(1500, 200, "keybind_list", " KEYBINDS ", itms)
     end
@@ -5293,7 +5048,6 @@ local cache = OperationOne.require("core.cache")
 local scan = OperationOne.require("features.combat.scan")
 local aimbot = OperationOne.require("features.combat.aimbot")
 local silent_aim = OperationOne.require("features.combat.silent_aim")
-local gun_mods = OperationOne.require("features.combat.gun_mods")
 local player_esp = OperationOne.require("features.visuals.player_esp")
 local world_esp = OperationOne.require("features.visuals.world_esp")
 local aimbot_visuals = OperationOne.require("features.visuals.aimbot_visuals")
@@ -5306,7 +5060,6 @@ M._menu_registered = false
 function M.register_all()
     if M._menu_registered then return end
     menu_defs.register_all()
-    gun_mods.register_menu()
     config.register_menu()
     M._menu_registered = true
 end
@@ -5349,7 +5102,8 @@ function M.update(_dt)
     menu.set_visible("silent_prediction_val", s.silent_aim_enabled and s.silent_prediction)
     menu.set_visible("silent_fov_style", s.silent_aim_enabled and s.silent_draw_fov)
     menu.set_visible("silent_fov_fill", s.silent_aim_enabled and s.silent_draw_fov)
-    menu.set_visible("silent_gadget_aim", s.silent_aim_enabled and s.silent_filter_visible)
+    menu.set_visible("silent_gadget_aim", s.silent_aim_enabled)
+    menu.set_visible("silent_gadget_team_check", s.silent_aim_enabled and s.silent_gadget_aim)
     scan.update_char_models()
     scan.scan_players()
     scan.scan_world()
@@ -5357,7 +5111,6 @@ function M.update(_dt)
     aimbot.process_toggle("world_enabled", cache.toggles.world, "world_enabled")
     silent_aim.update(_dt)
     aimbot.process_aimbot()
-    gun_mods.update(_dt)
 end
 
 function M.draw()

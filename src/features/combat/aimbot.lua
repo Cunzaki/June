@@ -2,6 +2,7 @@ local constants = OperationOne.require("core.constants")
 local settings = OperationOne.require("core.settings")
 local cache = OperationOne.require("core.cache")
 local draw_util = OperationOne.require("core.draw_util")
+local shootable_gadgets = OperationOne.require("game.shootable_gadgets")
 
 local sqrt = constants.sqrt
 local AIM_TARGET = constants.AIM_TARGET
@@ -182,37 +183,28 @@ function M.process_aimbot()
         if s.aimbot_players_priority and best and not best.target.is_utility then
             -- player already locked — don't consider gadgets
         else
-        local tu = {
-            DRONE = true,
-            C4 = true,
-            CLAYMORE = true,
-            JAMMER = true,
-            STICKY = true,
-            ["STICKY CAM"] = true,
-            BREACH = true,
-            CAMERA = true,
-            ["MAP CAM"] = true,
-            ["HARD BREACH"] = true,
-            ["PROX ALARM"] = true,
-            ["BP CAMERA"] = true,
-            ["BP CAM"] = true,
-        }
         local bl_opts = s.gadget_aim_blacklist or {}
         local bl_labels = {
-            "DRONE", "C4", "CLAYMORE", "JAMMER", "STICKY CAM", "BREACH",
-            "MAP CAM", "HARD BREACH", "PROX ALARM", "BP CAM",
+            "DRONE", "CLAYMORE", "C4", "JAMMER", "STICKY CAM", "BP CAM", "MAP CAM", "BREACH",
+            "HARD BREACH", "PROX ALARM", "BARBED WIRE", "SHIELD",
+            "THERMITE", "SHOCK BAT", "INC CANISTER", "NEEDLE MINE", "TOXIC",
         }
         local aim_blacklist = {}
         for i, enabled in ipairs(bl_opts) do
             if enabled and bl_labels[i] then
                 aim_blacklist[bl_labels[i]] = true
+                local base = shootable_gadgets.base_label(bl_labels[i])
+                if base and base ~= bl_labels[i] then
+                    aim_blacklist[base] = true
+                end
             end
         end
         for _, w in ipairs(cache.world) do
-            if w.dist <= s.utilities_max_distance and tu[w.label] and not aim_blacklist[w.label] then
-                if w.is_broken then
-                    goto continue_gadget
-                end
+            if w.dist <= s.utilities_max_distance
+                and shootable_gadgets.is_shootable_entry(w)
+                and not aim_blacklist[w.label]
+                and not aim_blacklist[shootable_gadgets.base_label(w.label)]
+            then
                 if s.world_team_check and w.is_teammate_gadget then
                     goto continue_gadget
                 end

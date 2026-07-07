@@ -3,6 +3,7 @@ local settings = OperationOne.require("core.settings")
 local cache = OperationOne.require("core.cache")
 local silent_ray = OperationOne.require("core.silent_ray")
 local silent_resolve = OperationOne.require("features.combat.silent_resolve")
+local shootable_gadgets = OperationOne.require("game.shootable_gadgets")
 
 local sqrt = constants.sqrt
 local AIM_TARGET = constants.AIM_TARGET
@@ -16,28 +17,12 @@ local last_target_scan = 0
 local weapon_hold_ticks = 0
 local bone_map = {[0] = "head", [1] = "torso", [2] = "arm1", [3] = "arm2", [4] = "leg1", [5] = "leg2"}
 
-local TARGETABLE_UTILITIES = {
-    DRONE = true,
-    C4 = true,
-    CLAYMORE = true,
-    JAMMER = true,
-    STICKY = true,
-    ["STICKY CAM"] = true,
-    BREACH = true,
-    CAMERA = true,
-    ["MAP CAM"] = true,
-    ["HARD BREACH"] = true,
-    ["PROX ALARM"] = true,
-    ["BP CAMERA"] = true,
-    ["BP CAM"] = true,
-    FLASH = true,
-    STUN = true,
-    FRAG = true,
-    SMOKE = true,
-    EMP = true,
-    IMPACT = true,
-    INCENDIARY = true,
-}
+local function silent_vis_enabled()
+    if menu and menu.get then
+        return menu.get("silent_filter_visible") == true
+    end
+    return s.silent_filter_visible == true
+end
 
 local function tick_ms()
     return utility and utility.get_tick_count and utility.get_tick_count() or 0
@@ -148,33 +133,23 @@ local function get_bone_pos(p)
     return apply_prediction(pos, p)
 end
 
-local function gadget_visible(w)
-    if not w then
-        return false
-    end
-    if not raycast or not raycast.is_visible then
-        return true
-    end
-    return raycast.is_visible(cache.cam_x, cache.cam_y, cache.cam_z, w.x, w.y, w.z)
-end
-
 local function passes_gadget_filters(w)
     if not w or not w.x then
         return false
     end
-    if not TARGETABLE_UTILITIES[w.label] then
+    if not shootable_gadgets.is_shootable_entry(w) then
         return false
     end
     if w.dist > (s.silent_max_dist or 250) then
         return false
     end
-    if w.is_broken then
+    if s.silent_gadget_team_check and w.is_teammate_gadget then
         return false
     end
-    if s.world_team_check and w.is_teammate_gadget then
+    if silent_vis_enabled() and w.is_visible ~= true then
         return false
     end
-    return gadget_visible(w)
+    return true
 end
 
 local function get_gadget_aim(entry)
@@ -296,7 +271,7 @@ local function find_target(cx, cy, fov)
         end
     end
 
-    if s.silent_filter_visible and s.silent_gadget_aim then
+    if s.silent_gadget_aim then
         for _, w in ipairs(cache.world) do
             local score = score_gadget(w, cx, cy, fov)
             if score and score < best_score then

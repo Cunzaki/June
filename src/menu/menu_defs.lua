@@ -175,7 +175,8 @@ M.menu_items = {
     },
     {g = "Combat", t = "checkbox", id = "silent_filter_health", n = "Silent Health Check", v = false, p = "silent_aim_enabled"},
     {g = "Combat", t = "checkbox", id = "silent_filter_visible", n = "Silent Visible Only", v = false, p = "silent_aim_enabled"},
-    {g = "Combat", t = "checkbox", id = "silent_gadget_aim", n = "Silent Gadget Aim", v = false, p = "silent_filter_visible"},
+    {g = "Combat", t = "checkbox", id = "silent_gadget_aim", n = "Silent Gadget Aim", v = false, p = "silent_aim_enabled"},
+    {g = "Combat", t = "checkbox", id = "silent_gadget_team_check", n = "Silent Gadget Team Check", v = false, p = "silent_gadget_aim"},
     {g = "Combat", t = "checkbox", id = "silent_filter_team", n = "Silent Team Check", v = false, p = "silent_aim_enabled"},
     {
         g = "Combat",
@@ -245,46 +246,6 @@ M.menu_items = {
         p = "silent_aim_enabled",
         c = {1, 0.25, 0.25, 1}
     },
-    {g = "Combat", t = "separator"},
-    {g = "Combat", t = "label", n = "Gun Mods (GC)"},
-    {g = "Combat", t = "checkbox", id = "gun_mods_enabled", n = "Enable Gun Mods", v = false},
-    {g = "Combat", t = "checkbox", id = "gm_no_recoil", n = "No Recoil", v = false, p = "gun_mods_enabled"},
-    {g = "Combat", t = "checkbox", id = "gm_no_spread", n = "No Spread", v = false, p = "gun_mods_enabled"},
-    {g = "Combat", t = "checkbox", id = "gm_firerate_enabled", n = "Fire Rate", v = false, p = "gun_mods_enabled"},
-    {
-        g = "Combat",
-        t = "slider_int",
-        id = "gm_firerate",
-        n = "Fire Rate (RPM)",
-        min = 400,
-        max = 2000,
-        v = 1200,
-        p = "gm_firerate_enabled"
-    },
-    {g = "Combat", t = "checkbox", id = "gm_speed_enabled", n = "Weapon Swap Speed", v = false, p = "gun_mods_enabled"},
-    {
-        g = "Combat",
-        t = "slider_float",
-        id = "gm_speed_mult",
-        n = "Swap Speed Mult",
-        min = 1.0,
-        max = 1.5,
-        v = 1.2,
-        p = "gm_speed_enabled"
-    },
-    {g = "Combat", t = "checkbox", id = "gm_reload_enabled", n = "Fast Reload", v = false, p = "gun_mods_enabled"},
-    {
-        g = "Combat",
-        t = "slider_float",
-        id = "gm_reload_mult",
-        n = "Reload Speed Mult",
-        min = 1.0,
-        max = 4.0,
-        v = 2.5,
-        p = "gm_reload_enabled"
-    },
-    {g = "Combat", t = "checkbox", id = "gm_accuracy_enabled", n = "Max Accuracy", v = false, p = "gun_mods_enabled"},
-    {g = "Combat", t = "checkbox", id = "gm_ads_enabled", n = "Instant ADS", v = false, p = "gun_mods_enabled"},
     {g = "Players", t = "checkbox", id = "players_enabled", n = "Enable Player Visuals", v = false, k = 0x73, c = {1, 1, 1, 1}},
     {g = "Players", t = "checkbox", id = "players_box", n = "Player Box", v = true, p = "players_enabled"},
     {
@@ -451,8 +412,8 @@ M.menu_items = {
         t = "multicombo",
         id = "gadget_aim_blacklist",
         n = "Aimbot Gadget Blacklist",
-        o = {"Drone", "C4", "Claymore", "Jammer", "Sticky Cam", "Breach", "Map Cam", "Hard Breach", "Prox Alarm", "BP Cam"},
-        v = {false, false, false, false, false, false, false, false, false, false},
+        o = {"Drone", "Claymore", "C4", "Jammer", "Sticky Cam", "BP Cam", "Map Cam", "Breach", "Hard Breach", "Prox Alarm", "Barbed Wire", "Shield", "Thermite", "Shock Bat", "Inc Canister", "Needle Mine", "Toxic"},
+        v = {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false},
         p = "utilities_aimbot"
     },
     {g = "World", t = "checkbox", id = "bomb_enabled", n = "Bomb", v = false, p = "world_enabled", c = {1, 0.2, 0.2, 1}},

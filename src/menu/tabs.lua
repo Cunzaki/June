@@ -5,7 +5,6 @@ local cache = OperationOne.require("core.cache")
 local scan = OperationOne.require("features.combat.scan")
 local aimbot = OperationOne.require("features.combat.aimbot")
 local silent_aim = OperationOne.require("features.combat.silent_aim")
-local gun_mods = OperationOne.require("features.combat.gun_mods")
 local player_esp = OperationOne.require("features.visuals.player_esp")
 local world_esp = OperationOne.require("features.visuals.world_esp")
 local aimbot_visuals = OperationOne.require("features.visuals.aimbot_visuals")
@@ -18,7 +17,6 @@ M._menu_registered = false
 function M.register_all()
     if M._menu_registered then return end
     menu_defs.register_all()
-    gun_mods.register_menu()
     config.register_menu()
     M._menu_registered = true
 end
@@ -61,7 +59,8 @@ function M.update(_dt)
     menu.set_visible("silent_prediction_val", s.silent_aim_enabled and s.silent_prediction)
     menu.set_visible("silent_fov_style", s.silent_aim_enabled and s.silent_draw_fov)
     menu.set_visible("silent_fov_fill", s.silent_aim_enabled and s.silent_draw_fov)
-    menu.set_visible("silent_gadget_aim", s.silent_aim_enabled and s.silent_filter_visible)
+    menu.set_visible("silent_gadget_aim", s.silent_aim_enabled)
+    menu.set_visible("silent_gadget_team_check", s.silent_aim_enabled and s.silent_gadget_aim)
     scan.update_char_models()
     scan.scan_players()
     scan.scan_world()
@@ -69,7 +68,6 @@ function M.update(_dt)
     aimbot.process_toggle("world_enabled", cache.toggles.world, "world_enabled")
     silent_aim.update(_dt)
     aimbot.process_aimbot()
-    gun_mods.update(_dt)
 end
 
 function M.draw()

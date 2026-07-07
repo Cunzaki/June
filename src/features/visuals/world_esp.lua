@@ -57,14 +57,18 @@ function M.render_world()
         end
 
         if w.x then
-            local dsq = dist3d_sq(w.x, w.y, w.z, cam_x, cam_y, cam_z)
+            local dsq = w.dsq
+            if not dsq then
+                dsq = dist3d_sq(w.x, w.y, w.z, cam_x, cam_y, cam_z)
+                w.dsq = dsq
+                w.dist = math.sqrt(dsq)
+            end
             if dsq > max_sq then
                 goto continue
             end
             if not w.dynamic and dsq <= DIST.ESP_HIDE_SQ then
                 goto continue
             end
-            w.dist = math.sqrt(dsq)
         end
 
         if show_box then

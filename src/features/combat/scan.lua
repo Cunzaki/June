@@ -3,6 +3,8 @@ local settings = OperationOne.require("core.settings")
 local cache = OperationOne.require("core.cache")
 local world_scan = OperationOne.require("game.world_scan")
 local draw_util = OperationOne.require("core.draw_util")
+local shootable_gadgets = OperationOne.require("game.shootable_gadgets")
+local vis_util = OperationOne.require("core.vis_util")
 
 local sqrt, min, max = constants.sqrt, constants.min, constants.max
 local DIST = constants.DIST
@@ -19,8 +21,14 @@ local project_bbox_screen = draw_util.project_bbox_screen
 local last_char_update = 0
 local last_player_discover = 0
 local last_world_static = 0
+local last_ws_sync = 0
+local last_map_sync = 0
+local last_lifecycle = 0
+local last_world_flags = 0
 local PLAYER_DISCOVER_MS = 200
 local WORLD_STATIC_MS = 2500
+local WORLD_LIFECYCLE_MS = 150
+local WORLD_FLAGS_MS = 100
 
 local function tick_ms()
     return utility and utility.get_tick_count and utility.get_tick_count() or 0
@@ -344,6 +352,25 @@ local function update_visibility(cam_x, cam_y, cam_z)
     end
 end
 
+local function update_gadget_visibility()
+    local need_gadget_vis = s.silent_filter_visible and s.silent_aim_enabled and s.silent_gadget_aim
+    if not need_gadget_vis then
+        for i = 1, #cache.world do
+            cache.world[i].is_visible = nil
+        end
+        return
+    end
+
+    for i = 1, #cache.world do
+        local w = cache.world[i]
+        if shootable_gadgets.is_shootable_entry(w) then
+            w.is_visible = vis_util.can_see_entry(w)
+        else
+            w.is_visible = nil
+        end
+    end
+end
+
 function M.scan_players()
     if not M.needs_player_scan() then
         for i = #cache.players, 1, -1 do
@@ -407,12 +434,13 @@ local TARGETABLE_UTILITIES = {
 
 function M.needs_world_scan()
     local utilities_active = s.aimbot_enabled and s.utilities_aimbot
-    local silent_gadgets = s.silent_aim_enabled and s.silent_filter_visible and s.silent_gadget_aim
+    local silent_gadgets = s.silent_aim_enabled and s.silent_gadget_aim
     return s.world_enabled or utilities_active or silent_gadgets
 end
 
 function M.scan_world()
     local utilities_active = s.aimbot_enabled and s.utilities_aimbot
+    local silent_gadgets = s.silent_aim_enabled and s.silent_gadget_aim
     if not cache.ws or not M.needs_world_scan() then
         cache.world = {}
         cache.world_lookup = {}
@@ -421,27 +449,48 @@ function M.scan_world()
 
     local now = tick_ms()
     local cam_x, cam_y, cam_z = cache.cam_x, cache.cam_y, cache.cam_z
+    local needs_fast = utilities_active or silent_gadgets
+    local gadget_aim_active = needs_fast
 
-    for i = 1, #cache.world do
-        world_scan.refresh_flags(cache.world[i], s)
+    if now - last_world_flags >= WORLD_FLAGS_MS then
+        last_world_flags = now
+        world_scan.refresh_flags(cache, s)
     end
 
-    world_scan.refresh_all(cache, cam_x, cam_y, cam_z, sqrt, cache.ws)
-
-    world_scan.sync_workspace(
-        cache.ws, s, utilities_active, cache,
-        cam_x, cam_y, cam_z, DIST.ESP_HIDE_SQ, sqrt
-    )
-
-    world_scan.sync_map_cameras(
-        cache.ws, s, utilities_active, cache,
-        cam_x, cam_y, cam_z, DIST.ESP_HIDE_SQ, sqrt
-    )
-
-    if now - last_world_static >= WORLD_STATIC_MS then
-        last_world_static = now
-        cache.stats.last_world_scan = now
+    if cache.should_refresh_positions() then
+        world_scan.refresh_positions(cache, cam_x, cam_y, cam_z, sqrt, false)
+    elseif needs_fast then
+        world_scan.refresh_positions(cache, cam_x, cam_y, cam_z, sqrt, true)
     end
+
+    if now - last_lifecycle >= WORLD_LIFECYCLE_MS then
+        last_lifecycle = now
+        world_scan.prune_lifecycle(cache, cache.ws, s.world_team_check or s.silent_gadget_team_check)
+    end
+
+    local ws_interval = (s.world_enabled or needs_fast) and cache.WORLD_DYNAMIC_MS or cache.WORKSPACE_SCAN_MS
+    if now - last_ws_sync >= ws_interval then
+        last_ws_sync = now
+        world_scan.sync_workspace(
+            cache.ws, s, utilities_active, cache,
+            cam_x, cam_y, cam_z, DIST.ESP_HIDE_SQ, sqrt, gadget_aim_active
+        )
+    end
+
+    local map_interval = gadget_aim_active and cache.WORLD_DYNAMIC_MS or cache.WORLD_STATIC_MS
+    if now - last_map_sync >= map_interval then
+        last_map_sync = now
+        world_scan.sync_map_cameras(
+            cache.ws, s, utilities_active, cache,
+            cam_x, cam_y, cam_z, DIST.ESP_HIDE_SQ, sqrt, gadget_aim_active
+        )
+        if now - last_world_static >= WORLD_STATIC_MS then
+            last_world_static = now
+            cache.stats.last_world_scan = now
+        end
+    end
+
+    update_gadget_visibility()
 end
 
 return M

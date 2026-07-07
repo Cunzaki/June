@@ -23,9 +23,6 @@ local function draw_keybind_window()
     if s.silent_aim_enabled then
         itms[#itms + 1] = "Silent Aim: ON"
     end
-    if s.gun_mods_enabled then
-        itms[#itms + 1] = "Gun Mods: ON"
-    end
     if #itms > 0 then
         draw.window(1500, 200, "keybind_list", " KEYBINDS ", itms)
     end

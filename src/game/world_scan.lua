@@ -4,6 +4,7 @@ local draw_util = OperationOne.require("core.draw_util")
 local world_items = OperationOne.require("game.world_items")
 local gadget_team = OperationOne.require("game.gadget_team")
 local gadget_lifecycle = OperationOne.require("game.gadget_lifecycle")
+local shootable_gadgets = OperationOne.require("game.shootable_gadgets")
 
 local M = {}
 
@@ -115,8 +116,11 @@ local function get_map_camera_folders(ws)
     return folders
 end
 
-local function should_scan_item(item, s, utilities_active)
+local function should_scan_item(item, s, utilities_active, gadget_aim_active)
     if s[item.enabled] then
+        return true
+    end
+    if gadget_aim_active and shootable_gadgets.is_shootable_item(item) then
         return true
     end
     if utilities_active and TARGETABLE_UTILITIES[item.label] then
@@ -125,11 +129,11 @@ local function should_scan_item(item, s, utilities_active)
     return false
 end
 
-local function in_draw_range(dsq, max_sq, hide_sq, dynamic)
+local function in_draw_range(dsq, max_sq, hide_sq, dynamic, for_aim)
     if dsq > max_sq then
         return false
     end
-    if dynamic then
+    if for_aim or dynamic then
         return true
     end
     return dsq > hide_sq
@@ -154,39 +158,22 @@ local function add_entry(cache, entry)
     end
 end
 
-local function resolve_position(obj, item, anchor)
-    local pos, sz = get_world_item_position(obj, item)
-    if pos then
-        return pos, sz, anchor or gadget_lifecycle.find_anchor(obj, item)
-    end
-
-    anchor = anchor or gadget_lifecycle.find_anchor(obj, item)
-    if anchor then
-        local x, y, z = unpack_pos(anchor.Position or anchor.position)
-        if x then
-            return {X = x, Y = y, Z = z}, anchor.Size or anchor.size, anchor
-        end
-    end
-
-    return nil, nil, anchor
-end
-
-local function make_entry(obj, item, s, cam_x, cam_y, cam_z, max_sq, hide_sq, sqrt, ws, camera_item)
+local function make_entry(obj, item, s, cam_x, cam_y, cam_z, max_sq, hide_sq, sqrt, ws, camera_item, for_aim)
     local scan_item = camera_item or item
-    if not gadget_lifecycle.is_trackable(obj, scan_item, ws) then
-        return nil
-    end
-
     local anchor = gadget_lifecycle.find_anchor(obj, scan_item)
-    if not anchor then
+    if not anchor or not gadget_lifecycle.is_trackable(obj, scan_item, ws, anchor) then
         return nil
     end
 
-    local pos, sz, resolved_anchor = resolve_position(obj, scan_item, anchor)
+    local pos, sz = get_world_item_position(obj, scan_item)
     if not pos then
-        return nil
+        local x, y, z = unpack_pos(anchor.Position or anchor.position)
+        if not x then
+            return nil
+        end
+        pos = {X = x, Y = y, Z = z}
+        sz = anchor.Size or anchor.size
     end
-    anchor = resolved_anchor or anchor
 
     local px, py, pz = unpack_pos(pos)
     if not px then
@@ -194,14 +181,14 @@ local function make_entry(obj, item, s, cam_x, cam_y, cam_z, max_sq, hide_sq, sq
     end
 
     local dsq = dist3d_sq(px, py, pz, cam_x, cam_y, cam_z)
-    local is_dynamic = item and item.dynamic == true
-    if not in_draw_range(dsq, max_sq, hide_sq, is_dynamic) then
+    local is_dynamic = (item and item.dynamic == true) or for_aim
+    if not in_draw_range(dsq, max_sq, hide_sq, is_dynamic, for_aim) then
         return nil
     end
 
     local label = item and item.label or (camera_item and camera_item.label) or obj.Name
     if camera_item then
-        label = gadget_lifecycle.camera_status_label(obj, label)
+        label = gadget_lifecycle.camera_status_label(obj, label, anchor)
     end
 
     local enabled_key = (camera_item and camera_item.enabled) or (item and item.enabled)
@@ -221,12 +208,13 @@ local function make_entry(obj, item, s, cam_x, cam_y, cam_z, max_sq, hide_sq, sq
         is_esp = enabled_key and s[enabled_key] == true,
         kind = (camera_item and camera_item.model_name) or (item and item.name),
         dist = sqrt(dsq),
+        dsq = dsq,
         key = M.inst_key(obj),
         dynamic = item and item.dynamic == true,
         static = (item and item.static == true) or (camera_item and camera_item.static == true),
         map_only = camera_item and camera_item.map_only == true,
         is_teammate_gadget = gadget_team.is_friendly_gadget(obj),
-        is_broken = gadget_lifecycle.is_broken(obj, scan_item),
+        is_broken = gadget_lifecycle.is_broken(obj, scan_item, anchor),
     }
 end
 
@@ -252,10 +240,11 @@ function M.get_max_sq(s, utilities_active)
     return max_dist * max_dist
 end
 
-function M.sync_workspace(ws, s, utilities_active, cache, cam_x, cam_y, cam_z, hide_sq, sqrt)
+function M.sync_workspace(ws, s, utilities_active, cache, cam_x, cam_y, cam_z, hide_sq, sqrt, gadget_aim_active)
     local seen = {}
-    local max_sq = M.get_max_sq(s, utilities_active)
+    local max_sq = M.get_max_sq(s, utilities_active or gadget_aim_active)
     local lookup = world_items.world_items_by_name
+    local for_aim = gadget_aim_active == true
 
     if not is_valid(ws) then
         return
@@ -263,18 +252,13 @@ function M.sync_workspace(ws, s, utilities_active, cache, cam_x, cam_y, cam_z, h
 
     for _, child in ipairs(ws:GetChildren()) do
         local item = lookup[child.Name]
-        if item and should_scan_item(item, s, utilities_active) then
-            if gadget_lifecycle.is_trackable(child, item, ws) then
+        if item and should_scan_item(item, s, utilities_active, gadget_aim_active) then
+            if is_valid(child) then
                 local key = M.inst_key(child)
                 if key then
                     seen[key] = true
-                    local entry = cache.world_lookup[key]
-                    if entry then
-                        M.refresh_flags(entry, s)
-                        entry.is_teammate_gadget = gadget_team.is_friendly_gadget(child)
-                        entry.is_broken = gadget_lifecycle.is_broken(child, item)
-                    else
-                        entry = make_entry(child, item, s, cam_x, cam_y, cam_z, max_sq, hide_sq, sqrt, ws, nil)
+                    if not cache.world_lookup[key] then
+                        local entry = make_entry(child, item, s, cam_x, cam_y, cam_z, max_sq, hide_sq, sqrt, ws, nil, for_aim)
                         if entry then
                             add_entry(cache, entry)
                         end
@@ -287,14 +271,15 @@ function M.sync_workspace(ws, s, utilities_active, cache, cam_x, cam_y, cam_z, h
     prune_entries(cache, function(w)
         return w.item and w.item.name and not w.map_only
     end, function(obj, item)
-        return gadget_lifecycle.is_trackable(obj, item, ws)
+        return gadget_lifecycle.is_trackable(obj, item, ws, nil)
     end, seen)
 end
 
-function M.sync_map_cameras(ws, s, utilities_active, cache, cam_x, cam_y, cam_z, hide_sq, sqrt)
+function M.sync_map_cameras(ws, s, utilities_active, cache, cam_x, cam_y, cam_z, hide_sq, sqrt, gadget_aim_active)
     local seen = {}
-    local max_sq = M.get_max_sq(s, utilities_active)
+    local max_sq = M.get_max_sq(s, utilities_active or gadget_aim_active)
     local default_camera = world_items.camera_items_by_name.DefaultCamera
+    local for_aim = gadget_aim_active == true
 
     if not default_camera then
         return
@@ -302,6 +287,7 @@ function M.sync_map_cameras(ws, s, utilities_active, cache, cam_x, cam_y, cam_z,
 
     local enabled = s[default_camera.enabled]
         or (utilities_active and TARGETABLE_UTILITIES["MAP CAM"])
+        or (gadget_aim_active and shootable_gadgets.is_shootable_item(default_camera))
 
     if not enabled then
         for i = #cache.world, 1, -1 do
@@ -318,20 +304,13 @@ function M.sync_map_cameras(ws, s, utilities_active, cache, cam_x, cam_y, cam_z,
         if is_valid(folder) then
             for _, child in ipairs(folder:GetChildren()) do
                 if is_valid(child) and child.Name == "DefaultCamera" then
-                    if gadget_lifecycle.is_trackable(child, default_camera, ws) then
-                        local key = M.inst_key(child)
-                        if key then
-                            seen[key] = true
-                            local entry = cache.world_lookup[key]
+                    local key = M.inst_key(child)
+                    if key then
+                        seen[key] = true
+                        if not cache.world_lookup[key] then
+                            local entry = make_entry(child, nil, s, cam_x, cam_y, cam_z, max_sq, hide_sq, sqrt, ws, default_camera, for_aim)
                             if entry then
-                                M.refresh_flags(entry, s)
-                                entry.is_broken = gadget_lifecycle.is_broken(child, default_camera)
-                                entry.label = gadget_lifecycle.camera_status_label(child, default_camera.label)
-                            else
-                                entry = make_entry(child, nil, s, cam_x, cam_y, cam_z, max_sq, hide_sq, sqrt, ws, default_camera)
-                                if entry then
-                                    add_entry(cache, entry)
-                                end
+                                add_entry(cache, entry)
                             end
                         end
                     end
@@ -342,78 +321,95 @@ function M.sync_map_cameras(ws, s, utilities_active, cache, cam_x, cam_y, cam_z,
 
     prune_entries(cache, function(w)
         return w.map_only == true
-    end, function(obj)
-        return gadget_lifecycle.is_trackable(obj, default_camera, ws)
+    end, function(obj, item)
+        return gadget_lifecycle.is_map_camera_placed(obj, ws)
+            and not gadget_lifecycle.is_camera_broken(obj, nil, nil)
     end, seen)
 end
 
-function M.refresh_workspace_entry(entry, cam_x, cam_y, cam_z, sqrt, ws)
-    if not entry or entry.map_only then
-        return false
-    end
-    if not gadget_lifecycle.is_trackable(entry.obj, entry.item, ws) then
+function M.refresh_entry_position(entry, cam_x, cam_y, cam_z, sqrt)
+    if not entry or not entry.obj or not is_valid(entry.obj) then
         return false
     end
 
-    local anchor = gadget_lifecycle.find_anchor(entry.obj, entry.item)
-    if not anchor then
-        return false
+    local anchor = entry.anchor
+    if not anchor or not is_valid(anchor) then
+        anchor = gadget_lifecycle.find_anchor(entry.obj, entry.item)
+        if not anchor then
+            return false
+        end
+        entry.anchor = anchor
     end
 
-    local pos, _, resolved_anchor = resolve_position(entry.obj, entry.item, anchor)
-    if not pos then
-        return false
+    local x, y, z
+    if entry.map_only then
+        x, y, z = unpack_pos(anchor.Position or anchor.position)
+    else
+        local pos = get_world_item_position(entry.obj, entry.item)
+        if pos then
+            x, y, z = unpack_pos(pos)
+        else
+            x, y, z = unpack_pos(anchor.Position or anchor.position)
+        end
     end
-    anchor = resolved_anchor or anchor
 
-    local x, y, z = unpack_pos(pos)
     if not x then
         return false
     end
 
-    entry.anchor = anchor
     entry.x = x
     entry.y = y
     entry.z = z
-    entry.dist = sqrt(dist3d_sq(x, y, z, cam_x, cam_y, cam_z))
-    entry.bbox = gadget_bbox(entry.item, anchor)
-    entry.is_teammate_gadget = gadget_team.is_friendly_gadget(entry.obj)
-    entry.is_broken = gadget_lifecycle.is_broken(entry.obj, entry.item)
+    local dsq = dist3d_sq(x, y, z, cam_x, cam_y, cam_z)
+    entry.dsq = dsq
+    entry.dist = sqrt(dsq)
+
+    if entry.dynamic or entry.map_only then
+        entry.bbox = gadget_bbox(entry.item, anchor)
+    end
     return true
 end
 
-function M.refresh_map_camera_entry(entry, cam_x, cam_y, cam_z, sqrt, ws)
-    if not entry or not entry.map_only then
-        return false
+function M.refresh_positions(cache, cam_x, cam_y, cam_z, sqrt, only_dynamic)
+    for i = 1, #cache.world do
+        local w = cache.world[i]
+        if not only_dynamic or w.dynamic then
+            M.refresh_entry_position(w, cam_x, cam_y, cam_z, sqrt)
+        end
     end
-
-    local camera_item = entry.item or world_items.camera_items_by_name.DefaultCamera
-    if not camera_item or not gadget_lifecycle.is_trackable(entry.obj, camera_item, ws) then
-        return false
-    end
-
-    local anchor = gadget_lifecycle.find_anchor(entry.obj, camera_item)
-    if not anchor then
-        return false
-    end
-
-    local x, y, z = unpack_pos(anchor.Position or anchor.position)
-    if not x then
-        return false
-    end
-
-    entry.anchor = anchor
-    entry.x = x
-    entry.y = y
-    entry.z = z
-    entry.dist = sqrt(dist3d_sq(x, y, z, cam_x, cam_y, cam_z))
-    entry.bbox = bbox_from_part(anchor)
-    entry.is_broken = gadget_lifecycle.is_broken(entry.obj, camera_item)
-    entry.label = gadget_lifecycle.camera_status_label(entry.obj, camera_item.label)
-    return true
 end
 
-function M.refresh_flags(entry, s)
+function M.prune_lifecycle(cache, ws, refresh_team)
+    for i = #cache.world, 1, -1 do
+        local w = cache.world[i]
+        local item = w.item
+        local anchor = w.anchor
+        if not is_valid(w.obj) or not gadget_lifecycle.is_trackable(w.obj, item, ws, anchor) then
+            remove_entry(cache, w)
+            table.remove(cache.world, i)
+        else
+            w.is_broken = gadget_lifecycle.is_broken(w.obj, item, anchor)
+            if w.map_only and item then
+                w.label = gadget_lifecycle.camera_status_label(w.obj, item.label, anchor)
+            end
+            if refresh_team then
+                w.is_teammate_gadget = gadget_team.is_friendly_gadget(w.obj)
+            end
+        end
+    end
+end
+
+function M.refresh_flags(cache_or_entry, s)
+    local entries = cache_or_entry
+    if cache_or_entry and cache_or_entry.world then
+        entries = cache_or_entry.world
+        for i = 1, #entries do
+            M.refresh_flags(entries[i], s)
+        end
+        return
+    end
+
+    local entry = cache_or_entry
     if entry.map_only and entry.item then
         entry.is_esp = s[entry.item.enabled] == true
         entry.color = s[entry.item.color_key .. "_color"] or entry.color
@@ -422,23 +418,6 @@ function M.refresh_flags(entry, s)
     if entry.item and entry.item.enabled then
         entry.is_esp = s[entry.item.enabled] == true
         entry.color = s[entry.item.enabled .. "_color"] or entry.color
-    end
-end
-
-function M.refresh_all(cache, cam_x, cam_y, cam_z, sqrt, ws)
-    ws = ws or cache.ws
-    for i = #cache.world, 1, -1 do
-        local w = cache.world[i]
-        local ok
-        if w.map_only then
-            ok = M.refresh_map_camera_entry(w, cam_x, cam_y, cam_z, sqrt, ws)
-        else
-            ok = M.refresh_workspace_entry(w, cam_x, cam_y, cam_z, sqrt, ws)
-        end
-        if not ok then
-            remove_entry(cache, w)
-            table.remove(cache.world, i)
-        end
     end
 end
 
