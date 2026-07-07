@@ -11,7 +11,6 @@ node_modules/
 
 # Vector load copy (bundled output is june.lua)
 Script 1.lua
-operation_one.lua
 
 # Local-only RE / reference material
 references/

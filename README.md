@@ -1,6 +1,6 @@
 # June
 
-**June** is a [Project Vector](https://project-vector-1.gitbook.io/vector-lua-engine/) script for **Operation One** (Roblox place `72920620366355`).
+**June** is a [Project Vector](https://project-vector-1.gitbook.io/vector-lua-engine/) script for Roblox place `72920620366355`.
 
 Player ESP, world gadget ESP, aimbot, silent aim, configs, and more — all from one loadstring.
 
@@ -11,7 +11,7 @@ Player ESP, world gadget ESP, aimbot, silent aim, configs, and more — all from
 Paste this in Vector and execute:
 
 ```lua
-utility.load_url("https://raw.githubusercontent.com/Cunzaki/April-Operation-One/refs/heads/main/june.lua")
+utility.load_url("https://raw.githubusercontent.com/Cunzaki/June/refs/heads/main/june.lua")
 ```
 
 Or run [`load.lua`](load.lua) from this repo (includes error handling).
@@ -71,7 +71,7 @@ Edit files under `src/`, rebuild, and push `june.lua` to GitHub so the loadstrin
 Gadget icons load from:
 
 ```
-https://raw.githubusercontent.com/Cunzaki/April-Operation-One/refs/heads/main/assets/gadgets/{id}.png
+https://raw.githubusercontent.com/Cunzaki/June/refs/heads/main/assets/gadgets/{id}.png
 ```
 
 Regenerate with `npm run assets` before pushing new icons.
@@ -81,7 +81,7 @@ Regenerate with `npm run assets` before pushing new icons.
 ## Requirements
 
 - [Project Vector](https://project-vector-1.gitbook.io/vector-lua-engine/) external
-- Operation One — join a match before enabling combat features
+- Join a match before enabling combat features
 
 ---
 
@@ -93,4 +93,4 @@ Set `June.debug = true` before or after load to print internal logs.
 
 ## Disclaimer
 
-For educational use. Not affiliated with Project Vector or Operation One. Use at your own risk.
+For educational use. Not affiliated with Project Vector. Use at your own risk.
