@@ -1,6 +1,6 @@
 --[[
-    June — Project Vector script for Operation One
-    Built: 2026-07-07T09:50:08.922Z
+    June — Project Vector script
+    Built: 2026-07-07T09:53:08.082Z
 ]]
 
 June = {
@@ -598,7 +598,7 @@ end)()
 
 -- ── game/gadget_lifecycle.lua ──
 June._mods["game.gadget_lifecycle"] = (function()
---[[ Gadget alive/broken rules derived from Operation One decompiled scripts.
+--[[ Gadget alive/broken rules derived from game decompiled scripts.
     Cameras: Disabled attribute, Cam/Dot transparency (Breakable/Electronic states).
     Placeables/throwables: leave Workspace when destroyed (Garbage pool).
 ]]
@@ -3191,7 +3191,7 @@ end)()
 
 -- ── features/combat/silent_resolve.lua ──
 June._mods["features.combat.silent_resolve"] = (function()
---[[ Silent ray origin — camera to target (Operation One hitscan). ]]
+--[[ Silent ray origin — camera to target (hitscan). ]]
 
 local silent_ray = June.require("core.silent_ray")
 
