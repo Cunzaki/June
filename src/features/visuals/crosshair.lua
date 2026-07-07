@@ -1,5 +1,5 @@
-local settings = OperationOne.require("core.settings")
-local cache = OperationOne.require("core.cache")
+local settings = June.require("core.settings")
+local cache = June.require("core.cache")
 
 local M = {}
 local s = settings.s

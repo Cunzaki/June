@@ -1,6 +1,6 @@
 --[[ Silent ray origin — camera to target (Operation One hitscan). ]]
 
-local silent_ray = OperationOne.require("core.silent_ray")
+local silent_ray = June.require("core.silent_ray")
 
 local M = {}
 

@@ -1,6 +1,6 @@
-local constants = OperationOne.require("core.constants")
-local settings = OperationOne.require("core.settings")
-local cache = OperationOne.require("core.cache")
+local constants = June.require("core.constants")
+local settings = June.require("core.settings")
+local cache = June.require("core.cache")
 
 local FOV_STYLE = constants.FOV_STYLE
 local TARGET_LINE_STYLE = constants.TARGET_LINE_STYLE

@@ -6,7 +6,7 @@
 
 local M = {}
 
-M.TAB = "Operation One"
+M.TAB = "June"
 
 M.G = {
     COMBAT = "Combat",
@@ -23,8 +23,8 @@ function M.ensure_tab()
     if M._tab_ready then
         return
     end
-    if not (OperationOne and OperationOne._menu_tab_ready) and menu and menu.add_tab then
-        menu.add_tab(M.TAB, "O", "full")
+    if not (June and June._menu_tab_ready) and menu and menu.add_tab then
+        menu.add_tab(M.TAB, "J", "full")
     end
     M._tab_ready = true
 end

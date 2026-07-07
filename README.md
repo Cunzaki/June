@@ -1,63 +1,96 @@
-# April Operation One
+# June
 
-Project Vector script for **Operation One** (place `72920620366355`).
+**June** is a [Project Vector](https://project-vector-1.gitbook.io/vector-lua-engine/) script for **Operation One** (Roblox place `72920620366355`).
 
-## Load in Vector
-
-**Option A — loadstring (recommended):**
-
-```lua
-utility.load_url("https://raw.githubusercontent.com/Cunzaki/April-Operation-One/refs/heads/main/operation_one.lua")
-```
-
-Or run `load.lua` from this repo.
-
-**Option B — local file:**
-
-1. Build: `npm run build`
-2. Load `operation_one.lua` in Vector → **Execute Script**.
-
-Menu: **Scripts → Operation One**
+Player ESP, world gadget ESP, aimbot, silent aim, configs, and more — all from one loadstring.
 
 ---
 
-## Rebuild from source
+## Quick load
+
+Paste this in Vector and execute:
+
+```lua
+utility.load_url("https://raw.githubusercontent.com/Cunzaki/June/refs/heads/main/june.lua")
+```
+
+Or run [`load.lua`](load.lua) from this repo.
+
+Open the menu: **Scripts → June**
+
+---
+
+## Features
+
+| Category | What's included |
+|----------|-----------------|
+| **Combat** | Aimbot (players + gadgets), silent aim, gadget targeting (drones, cameras, claymores, etc.), FOV circles, prediction |
+| **Players** | Box ESP, skeleton, tracers, health, names, team check, visibility filter |
+| **World** | Gadget ESP with icons, distance, team colors, break-state filtering |
+| **Settings** | Config save/load, keybind overlay, crosshair, FOV changer |
+
+---
+
+## Local install
+
+**Option A — loadstring (recommended):** use the snippet above.
+
+**Option B — run from disk:**
 
 ```bash
 npm run build
 ```
 
-Edit `src/`, rebuild, push `operation_one.lua` to GitHub.
+Then load `june.lua` in Vector → **Execute Script**.
 
 ---
 
-## Assets (GitHub CDN)
+## Development
 
 ```bash
-npm run assets
+npm run build    # bundle src/ → june.lua
+npm run assets   # refresh gadget PNGs for CDN
 ```
 
-PNG icons go to `assets/gadgets/`. Runtime loads via:
+Edit files under `src/`, rebuild, and push `june.lua` to GitHub so the loadstring stays up to date.
 
-`https://raw.githubusercontent.com/Cunzaki/April-Operation-One/refs/heads/main/assets/gadgets/{id}.png`
-
----
-
-## What's on GitHub (minimal)
+### Repo layout
 
 | Path | Purpose |
 |------|---------|
-| `load.lua` | One-line loadstring |
-| `operation_one.lua` | Bundled runtime script |
-| `src/` | Modular source |
-| `scripts/` | Bundle + asset tools |
-| `assets/` | CDN gadget icons |
-| `package.json` | `npm run build` |
+| [`load.lua`](load.lua) | One-line loadstring |
+| [`june.lua`](june.lua) | Bundled runtime script (what users load) |
+| [`src/`](src/) | Modular source |
+| [`scripts/`](scripts/) | Bundle + asset tools |
+| [`assets/`](assets/) | Gadget icons served via GitHub CDN |
 
 **Local only (gitignored):** `dump/`, `references/`, `Script 1.lua`, `node_modules/`
 
+### Asset CDN
+
+Gadget icons load from:
+
+```
+https://raw.githubusercontent.com/Cunzaki/June/refs/heads/main/assets/gadgets/{id}.png
+```
+
+Regenerate with `npm run assets` before pushing new icons.
+
 ---
 
-## License
+## Requirements
 
-Use at your own risk. Not affiliated with Project Vector or Operation One.
+- [Project Vector](https://project-vector-1.gitbook.io/vector-lua-engine/) external
+- Operation One — join a match before enabling combat features
+
+---
+
+## Debug
+
+Set `June.debug = true` before or after load to print internal logs.
+
+---
+
+## Disclaimer
+
+For educational use. Not affiliated with Project Vector or Operation One. Use at your own risk.

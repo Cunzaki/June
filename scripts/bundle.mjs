@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Builds operation_one.lua — the single Vector-executable script.
+ * Builds june.lua — the single Vector-executable script.
  */
 
 import fs from "fs";
@@ -9,7 +9,7 @@ import { fileURLToPath } from "url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = path.join(ROOT, "src");
-const OUT = path.join(ROOT, "operation_one.lua");
+const OUT = path.join(ROOT, "june.lua");
 
 const ORDER = [
   "core/constants.lua",
@@ -43,26 +43,26 @@ const ORDER = [
 ];
 
 const header = `--[[
-    April Operation One for Project Vector
+    June — Project Vector script for Operation One
     Built: ${new Date().toISOString()}
 ]]
 
-OperationOne = {
-    version = "1.1.0",
+June = {
+    version = "1.0.0",
     debug = false,
     _mods = {},
     bundled = true,
 }
 
 if menu and menu.add_tab then
-    menu.add_tab("Operation One", "O", "full")
+    menu.add_tab("June", "J", "full")
 end
-OperationOne._menu_tab_ready = true
+June._menu_tab_ready = true
 
-function OperationOne.require(path)
-    local mod = OperationOne._mods[path]
+function June.require(path)
+    local mod = June._mods[path]
     if mod == nil then
-        error("[OperationOne] bundled module missing: " .. path)
+        error("[June] bundled module missing: " .. path)
     end
     return mod
 end
@@ -71,21 +71,21 @@ end
 
 const footer = `
 do
-    OperationOne.require("menu.tabs").register_all()
+    June.require("menu.tabs").register_all()
 end
 
-OperationOne._init_ok = false
+June._init_ok = false
 
 local ok, err = pcall(function()
-    local debug = OperationOne.require("core.debug")
-    local app = OperationOne.require("app")
+    local debug = June.require("core.debug")
+    local app = June.require("app")
 
     if not app.init() then
         debug.error_once("init", "app.init() returned false")
         return
     end
 
-    OperationOne._init_ok = true
+    June._init_ok = true
 
     if not debug.register_frame_hook(function()
         app.on_frame()
@@ -95,7 +95,7 @@ local ok, err = pcall(function()
 end)
 
 if not ok then
-    print("[OperationOne] Fatal: " .. tostring(err))
+    print("[June] Fatal: " .. tostring(err))
     if debug and debug.traceback then print(debug.traceback(err)) end
 end
 `;
@@ -110,7 +110,7 @@ for (const rel of ORDER) {
   const modPath = rel.replace(/\.lua$/, "").replace(/\//g, ".");
   const src = fs.readFileSync(full, "utf8");
   body += `\n-- ── ${rel} ──\n`;
-  body += `OperationOne._mods["${modPath}"] = (function()\n${src}\nend)()\n`;
+  body += `June._mods["${modPath}"] = (function()\n${src}\nend)()\n`;
 }
 
 fs.writeFileSync(OUT, header + body + footer);

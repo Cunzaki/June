@@ -1,5 +1,5 @@
-local menu_defs = OperationOne.require("menu.menu_defs")
-local world_items = OperationOne.require("game.world_items")
+local menu_defs = June.require("menu.menu_defs")
+local world_items = June.require("game.world_items")
 
 local M = {}
 M.s = {}

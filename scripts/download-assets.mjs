@@ -27,7 +27,7 @@ async function sleep(ms) {
 
 async function downloadUrl(url, dest) {
   const res = await fetch(url, {
-    headers: { "User-Agent": "OperationOne-Asset-Sync/1.0" },
+    headers: { "User-Agent": "June-Asset-Sync/1.0" },
     redirect: "follow",
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -45,7 +45,7 @@ async function resolveThumbnails(ids) {
     format: "Png",
   });
   const res = await fetch(`${THUMB_API}?${q}`, {
-    headers: { "User-Agent": "OperationOne-Asset-Sync/1.0" },
+    headers: { "User-Agent": "June-Asset-Sync/1.0" },
   });
   if (!res.ok) throw new Error(`Thumbnails API HTTP ${res.status}`);
   const json = await res.json();

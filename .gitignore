@@ -9,8 +9,9 @@ node_modules/
 # Backups
 *.bak
 
-# Vector load copy (bundled output is operation_one.lua)
+# Vector load copy (bundled output is june.lua)
 Script 1.lua
+operation_one.lua
 
 # Local-only RE / reference material
 references/
@@ -33,8 +34,8 @@ scripts/split_monolith.mjs
 assets/missing.json
 
 # Local Vector config files
-OperationOne_Slot_*.txt
-OperationOne_meta.txt
+June_Slot_*.txt
+June_meta.txt
 
 # Editor / local env
 *.local

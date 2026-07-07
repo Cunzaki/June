@@ -1,31 +1,31 @@
 --[[
-    April Operation One for Project Vector
-    Built: 2026-07-07T09:41:29.485Z
+    June — Project Vector script for Operation One
+    Built: 2026-07-07T09:45:13.473Z
 ]]
 
-OperationOne = {
-    version = "1.1.0",
+June = {
+    version = "1.0.0",
     debug = false,
     _mods = {},
     bundled = true,
 }
 
 if menu and menu.add_tab then
-    menu.add_tab("Operation One", "O", "full")
+    menu.add_tab("June", "J", "full")
 end
-OperationOne._menu_tab_ready = true
+June._menu_tab_ready = true
 
-function OperationOne.require(path)
-    local mod = OperationOne._mods[path]
+function June.require(path)
+    local mod = June._mods[path]
     if mod == nil then
-        error("[OperationOne] bundled module missing: " .. path)
+        error("[June] bundled module missing: " .. path)
     end
     return mod
 end
 
 
 -- ── core/constants.lua ──
-OperationOne._mods["core.constants"] = (function()
+June._mods["core.constants"] = (function()
 local M = {}
 
 local sqrt, floor, min, max = math.sqrt, math.floor, math.min, math.max
@@ -66,7 +66,7 @@ return M
 end)()
 
 -- ── core/env.lua ──
-OperationOne._mods["core.env"] = (function()
+June._mods["core.env"] = (function()
 local M = {}
 
 function M.has_api(name)
@@ -116,8 +116,8 @@ return M
 end)()
 
 -- ── core/debug.lua ──
-OperationOne._mods["core.debug"] = (function()
---[[ Operation One debug — off by default. Set OperationOne.debug = true for logs. ]]
+June._mods["core.debug"] = (function()
+--[[ June debug — off by default. Set June.debug = true for logs. ]]
 
 local M = {}
 
@@ -125,21 +125,21 @@ local seen_errors = {}
 local frame_count = 0
 
 function M.enabled()
-    return OperationOne and OperationOne.debug == true
+    return June and June.debug == true
 end
 
 function M.verbose()
-    return OperationOne and OperationOne.debug_verbose == true
+    return June and June.debug_verbose == true
 end
 
 function M.log(msg)
     if not M.enabled() then return end
-    print("[OperationOne] " .. tostring(msg))
+    print("[June] " .. tostring(msg))
 end
 
 function M.warn(msg)
     if not M.enabled() then return end
-    print("[OperationOne WARN] " .. tostring(msg))
+    print("[June WARN] " .. tostring(msg))
 end
 
 function M.warn_once(key, msg)
@@ -152,7 +152,7 @@ function M.error_once(key, err)
     seen_errors[key] = (seen_errors[key] or 0) + 1
     local count = seen_errors[key]
     local suffix = count > 1 and (" (x" .. count .. ")") or ""
-    print("[OperationOne ERROR][" .. key .. "] " .. tostring(err) .. suffix)
+    print("[June ERROR][" .. key .. "] " .. tostring(err) .. suffix)
     if debug and debug.traceback then
         print(debug.traceback(err, 2))
     end
@@ -168,13 +168,24 @@ function M.guard(key, fn, ...)
     return a, b, c
 end
 
+function M.tick_frame()
+    frame_count = frame_count + 1
+end
+
+function M.traceback(err, level)
+    if debug and debug.traceback then
+        return debug.traceback(err, level or 2)
+    end
+    return tostring(err)
+end
+
 function M.register_frame_hook(fn)
     if type(fn) ~= "function" then
         M.error_once("frame_hook", "on_frame handler is not a function")
         return false
     end
 
-    -- Vector only invokes global on_frame (see April/docs/API.md).
+    -- Vector only invokes global on_frame.
     -- callbacks.add / draw.callback stack on reload and draw everything twice.
     _G.on_frame = fn
 
@@ -185,16 +196,12 @@ function M.register_frame_hook(fn)
     return true
 end
 
-function M.tick_frame()
-    frame_count = frame_count + 1
-end
-
 return M
 
 end)()
 
 -- ── core/cache.lua ──
-OperationOne._mods["core.cache"] = (function()
+June._mods["core.cache"] = (function()
 local M = {
     players = {},
     world = {},
@@ -267,7 +274,7 @@ return M
 end)()
 
 -- ── core/menu_util.lua ──
-OperationOne._mods["core.menu_util"] = (function()
+June._mods["core.menu_util"] = (function()
 --[[
     Vector full-mode grid:
       menu.add_group(tab, name)           -> left column, new row
@@ -276,7 +283,7 @@ OperationOne._mods["core.menu_util"] = (function()
 
 local M = {}
 
-M.TAB = "Operation One"
+M.TAB = "June"
 
 M.G = {
     COMBAT = "Combat",
@@ -293,8 +300,8 @@ function M.ensure_tab()
     if M._tab_ready then
         return
     end
-    if not (OperationOne and OperationOne._menu_tab_ready) and menu and menu.add_tab then
-        menu.add_tab(M.TAB, "O", "full")
+    if not (June and June._menu_tab_ready) and menu and menu.add_tab then
+        menu.add_tab(M.TAB, "J", "full")
     end
     M._tab_ready = true
 end
@@ -327,10 +334,10 @@ return M
 end)()
 
 -- ── core/incremental_scan.lua ──
-OperationOne._mods["core.incremental_scan"] = (function()
+June._mods["core.incremental_scan"] = (function()
 --[[ Time-budgeted scans — spread heavy workspace work across frames. ]]
 
-local debug = OperationOne.require("core.debug")
+local debug = June.require("core.debug")
 
 local M = {}
 
@@ -428,7 +435,7 @@ return M
 end)()
 
 -- ── game/world_items.lua ──
-OperationOne._mods["game.world_items"] = (function()
+June._mods["game.world_items"] = (function()
 local M = {}
 
 M.world_items = {
@@ -491,10 +498,10 @@ return M
 end)()
 
 -- ── game/gadget_team.lua ──
-OperationOne._mods["game.gadget_team"] = (function()
+June._mods["game.gadget_team"] = (function()
 --[[ Gadget ownership — mirrors Util.ownership from game scripts (UserId / Team attributes). ]]
 
-local env = OperationOne.require("core.env")
+local env = June.require("core.env")
 
 local M = {}
 
@@ -590,7 +597,7 @@ return M
 end)()
 
 -- ── game/gadget_lifecycle.lua ──
-OperationOne._mods["game.gadget_lifecycle"] = (function()
+June._mods["game.gadget_lifecycle"] = (function()
 --[[ Gadget alive/broken rules derived from Operation One decompiled scripts.
     Cameras: Disabled attribute, Cam/Dot transparency (Breakable/Electronic states).
     Placeables/throwables: leave Workspace when destroyed (Garbage pool).
@@ -847,7 +854,7 @@ return M
 end)()
 
 -- ── game/shootable_gadgets.lua ──
-OperationOne._mods["game.shootable_gadgets"] = (function()
+June._mods["game.shootable_gadgets"] = (function()
 --[[ Shootable / destroyable gadgets for gadget aimbot + silent gadget aim.
     Sources: dump/scripts — StateObject Breakable (cameras, placeables) and Drone Humanoid health.
     Excludes round objectives (Bomb/Defuser) and throwables (grenades).
@@ -960,8 +967,8 @@ return M
 end)()
 
 -- ── menu/menu_defs.lua ──
-OperationOne._mods["menu.menu_defs"] = (function()
-local menu_util = OperationOne.require("core.menu_util")
+June._mods["menu.menu_defs"] = (function()
+local menu_util = June.require("core.menu_util")
 
 local M = {}
 
@@ -1638,9 +1645,9 @@ return M
 end)()
 
 -- ── core/settings.lua ──
-OperationOne._mods["core.settings"] = (function()
-local menu_defs = OperationOne.require("menu.menu_defs")
-local world_items = OperationOne.require("game.world_items")
+June._mods["core.settings"] = (function()
+local menu_defs = June.require("menu.menu_defs")
+local world_items = June.require("game.world_items")
 
 local M = {}
 M.s = {}
@@ -1689,10 +1696,10 @@ return M
 end)()
 
 -- ── core/draw_util.lua ──
-OperationOne._mods["core.draw_util"] = (function()
-local constants = OperationOne.require("core.constants")
-local settings = OperationOne.require("core.settings")
-local cache = OperationOne.require("core.cache")
+June._mods["core.draw_util"] = (function()
+local constants = June.require("core.constants")
+local settings = June.require("core.settings")
+local cache = June.require("core.cache")
 
 local sqrt, floor, min, max = constants.sqrt, constants.floor, constants.min, constants.max
 local BOX_TYPE = constants.BOX_TYPE
@@ -2513,14 +2520,14 @@ return M
 end)()
 
 -- ── game/world_scan.lua ──
-OperationOne._mods["game.world_scan"] = (function()
+June._mods["game.world_scan"] = (function()
 --[[ World gadget scan — workspace + map cameras, per-type lifecycle from game dump. ]]
 
-local draw_util = OperationOne.require("core.draw_util")
-local world_items = OperationOne.require("game.world_items")
-local gadget_team = OperationOne.require("game.gadget_team")
-local gadget_lifecycle = OperationOne.require("game.gadget_lifecycle")
-local shootable_gadgets = OperationOne.require("game.shootable_gadgets")
+local draw_util = June.require("core.draw_util")
+local world_items = June.require("game.world_items")
+local gadget_team = June.require("game.gadget_team")
+local gadget_lifecycle = June.require("game.gadget_lifecycle")
+local shootable_gadgets = June.require("game.shootable_gadgets")
 
 local M = {}
 
@@ -2942,7 +2949,7 @@ return M
 end)()
 
 -- ── core/silent_ray.lua ──
-OperationOne._mods["core.silent_ray"] = (function()
+June._mods["core.silent_ray"] = (function()
 --[[ Silent raycast hook — Vector API track_silent_target (see docs/API.md). ]]
 
 local M = {}
@@ -3086,10 +3093,10 @@ return M
 end)()
 
 -- ── core/vis_util.lua ──
-OperationOne._mods["core.vis_util"] = (function()
+June._mods["core.vis_util"] = (function()
 --[[ Line-of-sight helpers — raycast.cast (fail-closed) with gadget target matching. ]]
 
-local silent_ray = OperationOne.require("core.silent_ray")
+local silent_ray = June.require("core.silent_ray")
 
 local M = {}
 
@@ -3177,10 +3184,10 @@ return M
 end)()
 
 -- ── features/combat/silent_resolve.lua ──
-OperationOne._mods["features.combat.silent_resolve"] = (function()
+June._mods["features.combat.silent_resolve"] = (function()
 --[[ Silent ray origin — camera to target (Operation One hitscan). ]]
 
-local silent_ray = OperationOne.require("core.silent_ray")
+local silent_ray = June.require("core.silent_ray")
 
 local M = {}
 
@@ -3202,14 +3209,14 @@ return M
 end)()
 
 -- ── features/utility/config.lua ──
-OperationOne._mods["features.utility.config"] = (function()
-local menu_defs = OperationOne.require("menu.menu_defs")
-local menu_util = OperationOne.require("core.menu_util")
+June._mods["features.utility.config"] = (function()
+local menu_defs = June.require("menu.menu_defs")
+local menu_util = June.require("core.menu_util")
 
 local M = {}
 local menu_items = menu_defs.menu_items
 
-local AUTOLOAD_FILE = 'AnxietyAutoload.txt'
+local AUTOLOAD_FILE = 'JuneAutoload.txt'
 
 local function cfg_path(name)
     if not name or name == '' then name = 'default' end
@@ -3224,7 +3231,7 @@ local function save_cfg(name)
     local path = cfg_path(cfg_name)
     local f = io.open(path, 'w')
     if not f then
-        print('[Anxiety] Save failed - could not open: ' .. path)
+        print('[June] Save failed - could not open: ' .. path)
         return false
     end
     for _, m in ipairs(menu_items) do
@@ -3268,7 +3275,7 @@ local function save_cfg(name)
     -- Always write autoload marker
     local af = io.open(AUTOLOAD_FILE, 'w')
     if af then af:write(cfg_name) af:close() end
-    print('[Anxiety] Config saved: ' .. path)
+    print('[June] Config saved: ' .. path)
     return true
 end
 
@@ -3332,7 +3339,7 @@ local function load_cfg(name)
         ::continue::
     end
     if count > 0 then
-        print('[Anxiety] Config loaded: ' .. path .. ' (' .. count .. ' values)')
+        print('[June] Config loaded: ' .. path .. ' (' .. count .. ' values)')
     end
     return true
 end
@@ -3353,7 +3360,7 @@ function M.register_menu()
 end
 
 function M.autoload()
-    -- Autoload on startup: try AnxietyAutoload.txt first, then fallback to default
+    -- Autoload on startup: try JuneAutoload.txt first, then fallback to default
     local _af = io.open(AUTOLOAD_FILE, 'r')
     if _af then
         local _aname = _af:read('*l')
@@ -3376,14 +3383,14 @@ return M
 end)()
 
 -- ── features/combat/scan.lua ──
-OperationOne._mods["features.combat.scan"] = (function()
-local constants = OperationOne.require("core.constants")
-local settings = OperationOne.require("core.settings")
-local cache = OperationOne.require("core.cache")
-local world_scan = OperationOne.require("game.world_scan")
-local draw_util = OperationOne.require("core.draw_util")
-local shootable_gadgets = OperationOne.require("game.shootable_gadgets")
-local vis_util = OperationOne.require("core.vis_util")
+June._mods["features.combat.scan"] = (function()
+local constants = June.require("core.constants")
+local settings = June.require("core.settings")
+local cache = June.require("core.cache")
+local world_scan = June.require("game.world_scan")
+local draw_util = June.require("core.draw_util")
+local shootable_gadgets = June.require("game.shootable_gadgets")
+local vis_util = June.require("core.vis_util")
 
 local sqrt, min, max = constants.sqrt, constants.min, constants.max
 local DIST = constants.DIST
@@ -3877,12 +3884,12 @@ return M
 end)()
 
 -- ── features/combat/aimbot.lua ──
-OperationOne._mods["features.combat.aimbot"] = (function()
-local constants = OperationOne.require("core.constants")
-local settings = OperationOne.require("core.settings")
-local cache = OperationOne.require("core.cache")
-local draw_util = OperationOne.require("core.draw_util")
-local shootable_gadgets = OperationOne.require("game.shootable_gadgets")
+June._mods["features.combat.aimbot"] = (function()
+local constants = June.require("core.constants")
+local settings = June.require("core.settings")
+local cache = June.require("core.cache")
+local draw_util = June.require("core.draw_util")
+local shootable_gadgets = June.require("game.shootable_gadgets")
 
 local sqrt = constants.sqrt
 local AIM_TARGET = constants.AIM_TARGET
@@ -4163,13 +4170,13 @@ return M
 end)()
 
 -- ── features/combat/silent_aim.lua ──
-OperationOne._mods["features.combat.silent_aim"] = (function()
-local constants = OperationOne.require("core.constants")
-local settings = OperationOne.require("core.settings")
-local cache = OperationOne.require("core.cache")
-local silent_ray = OperationOne.require("core.silent_ray")
-local silent_resolve = OperationOne.require("features.combat.silent_resolve")
-local shootable_gadgets = OperationOne.require("game.shootable_gadgets")
+June._mods["features.combat.silent_aim"] = (function()
+local constants = June.require("core.constants")
+local settings = June.require("core.settings")
+local cache = June.require("core.cache")
+local silent_ray = June.require("core.silent_ray")
+local silent_resolve = June.require("features.combat.silent_resolve")
+local shootable_gadgets = June.require("game.shootable_gadgets")
 
 local sqrt = constants.sqrt
 local AIM_TARGET = constants.AIM_TARGET
@@ -4575,11 +4582,11 @@ return M
 end)()
 
 -- ── features/visuals/player_esp.lua ──
-OperationOne._mods["features.visuals.player_esp"] = (function()
-local constants = OperationOne.require("core.constants")
-local settings = OperationOne.require("core.settings")
-local cache = OperationOne.require("core.cache")
-local draw_util = OperationOne.require("core.draw_util")
+June._mods["features.visuals.player_esp"] = (function()
+local constants = June.require("core.constants")
+local settings = June.require("core.settings")
+local cache = June.require("core.cache")
+local draw_util = June.require("core.draw_util")
 
 local sqrt, floor, min, max = constants.sqrt, constants.floor, constants.min, constants.max
 local clamp = constants.clamp
@@ -4765,14 +4772,14 @@ return M
 end)()
 
 -- ── features/visuals/world_esp.lua ──
-OperationOne._mods["features.visuals.world_esp"] = (function()
-local settings = OperationOne.require("core.settings")
-local cache = OperationOne.require("core.cache")
-local draw_util = OperationOne.require("core.draw_util")
-local world_scan = OperationOne.require("game.world_scan")
+June._mods["features.visuals.world_esp"] = (function()
+local settings = June.require("core.settings")
+local cache = June.require("core.cache")
+local draw_util = June.require("core.draw_util")
+local world_scan = June.require("game.world_scan")
 
-local floor = OperationOne.require("core.constants").floor
-local DIST = OperationOne.require("core.constants").DIST
+local floor = June.require("core.constants").floor
+local DIST = June.require("core.constants").DIST
 
 local M = {}
 local s = settings.s
@@ -4868,10 +4875,10 @@ return M
 end)()
 
 -- ── features/visuals/aimbot_visuals.lua ──
-OperationOne._mods["features.visuals.aimbot_visuals"] = (function()
-local constants = OperationOne.require("core.constants")
-local settings = OperationOne.require("core.settings")
-local cache = OperationOne.require("core.cache")
+June._mods["features.visuals.aimbot_visuals"] = (function()
+local constants = June.require("core.constants")
+local settings = June.require("core.settings")
+local cache = June.require("core.cache")
 
 local FOV_STYLE = constants.FOV_STYLE
 local TARGET_LINE_STYLE = constants.TARGET_LINE_STYLE
@@ -4966,9 +4973,9 @@ return M
 end)()
 
 -- ── features/visuals/crosshair.lua ──
-OperationOne._mods["features.visuals.crosshair"] = (function()
-local settings = OperationOne.require("core.settings")
-local cache = OperationOne.require("core.cache")
+June._mods["features.visuals.crosshair"] = (function()
+local settings = June.require("core.settings")
+local cache = June.require("core.cache")
 
 local M = {}
 local s = settings.s
@@ -5002,8 +5009,8 @@ return M
 end)()
 
 -- ── features/utility/keybind_window.lua ──
-OperationOne._mods["features.utility.keybind_window"] = (function()
-local settings = OperationOne.require("core.settings")
+June._mods["features.utility.keybind_window"] = (function()
+local settings = June.require("core.settings")
 
 local M = {}
 local s = settings.s
@@ -5040,19 +5047,19 @@ return M
 end)()
 
 -- ── menu/tabs.lua ──
-OperationOne._mods["menu.tabs"] = (function()
-local menu_defs = OperationOne.require("menu.menu_defs")
-local config = OperationOne.require("features.utility.config")
-local settings = OperationOne.require("core.settings")
-local cache = OperationOne.require("core.cache")
-local scan = OperationOne.require("features.combat.scan")
-local aimbot = OperationOne.require("features.combat.aimbot")
-local silent_aim = OperationOne.require("features.combat.silent_aim")
-local player_esp = OperationOne.require("features.visuals.player_esp")
-local world_esp = OperationOne.require("features.visuals.world_esp")
-local aimbot_visuals = OperationOne.require("features.visuals.aimbot_visuals")
-local crosshair = OperationOne.require("features.visuals.crosshair")
-local keybind_window = OperationOne.require("features.utility.keybind_window")
+June._mods["menu.tabs"] = (function()
+local menu_defs = June.require("menu.menu_defs")
+local config = June.require("features.utility.config")
+local settings = June.require("core.settings")
+local cache = June.require("core.cache")
+local scan = June.require("features.combat.scan")
+local aimbot = June.require("features.combat.aimbot")
+local silent_aim = June.require("features.combat.silent_aim")
+local player_esp = June.require("features.visuals.player_esp")
+local world_esp = June.require("features.visuals.world_esp")
+local aimbot_visuals = June.require("features.visuals.aimbot_visuals")
+local crosshair = June.require("features.visuals.crosshair")
+local keybind_window = June.require("features.utility.keybind_window")
 
 local M = {}
 M._menu_registered = false
@@ -5127,9 +5134,9 @@ return M
 end)()
 
 -- ── app.lua ──
-OperationOne._mods["app"] = (function()
-local tabs = OperationOne.require("menu.tabs")
-local debug = OperationOne.require("core.debug")
+June._mods["app"] = (function()
+local tabs = June.require("menu.tabs")
+local debug = June.require("core.debug")
 
 local M = {}
 local initialized = false
@@ -5158,21 +5165,21 @@ return M
 end)()
 
 do
-    OperationOne.require("menu.tabs").register_all()
+    June.require("menu.tabs").register_all()
 end
 
-OperationOne._init_ok = false
+June._init_ok = false
 
 local ok, err = pcall(function()
-    local debug = OperationOne.require("core.debug")
-    local app = OperationOne.require("app")
+    local debug = June.require("core.debug")
+    local app = June.require("app")
 
     if not app.init() then
         debug.error_once("init", "app.init() returned false")
         return
     end
 
-    OperationOne._init_ok = true
+    June._init_ok = true
 
     if not debug.register_frame_hook(function()
         app.on_frame()
@@ -5182,6 +5189,6 @@ local ok, err = pcall(function()
 end)
 
 if not ok then
-    print("[OperationOne] Fatal: " .. tostring(err))
+    print("[June] Fatal: " .. tostring(err))
     if debug and debug.traceback then print(debug.traceback(err)) end
 end

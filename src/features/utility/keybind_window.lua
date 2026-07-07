@@ -1,4 +1,4 @@
-local settings = OperationOne.require("core.settings")
+local settings = June.require("core.settings")
 
 local M = {}
 local s = settings.s

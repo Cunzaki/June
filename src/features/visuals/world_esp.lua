@@ -1,10 +1,10 @@
-local settings = OperationOne.require("core.settings")
-local cache = OperationOne.require("core.cache")
-local draw_util = OperationOne.require("core.draw_util")
-local world_scan = OperationOne.require("game.world_scan")
+local settings = June.require("core.settings")
+local cache = June.require("core.cache")
+local draw_util = June.require("core.draw_util")
+local world_scan = June.require("game.world_scan")
 
-local floor = OperationOne.require("core.constants").floor
-local DIST = OperationOne.require("core.constants").DIST
+local floor = June.require("core.constants").floor
+local DIST = June.require("core.constants").DIST
 
 local M = {}
 local s = settings.s

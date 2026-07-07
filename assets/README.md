@@ -1,6 +1,6 @@
 # Assets
 
-Gadget and operator icons for April Operation One.
+Gadget and operator icons for **June** (Operation One).
 
 ## Generate
 
@@ -11,12 +11,14 @@ npm run assets
 
 PNG files land in `assets/gadgets/{assetId}.png`.
 
-Asset IDs come from `dump/properties/ImageLabel.jsonl`.
+Asset IDs come from `dump/properties/ImageLabel.jsonl` (local dev only).
 
 ## GitHub CDN
 
 After pushing to GitHub, runtime loads via one HTTPS URL per image:
 
-`https://raw.githubusercontent.com/Cunzaki/April-Operation-One/refs/heads/main/assets/gadgets/{assetId}.png`
+```
+https://raw.githubusercontent.com/Cunzaki/June/refs/heads/main/assets/gadgets/{assetId}.png
+```
 
-See `src/game/asset_urls.lua` and `docs/API.md`.
+See `src/game/asset_urls.lua`.

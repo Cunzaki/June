@@ -1,5 +1,5 @@
-local tabs = OperationOne.require("menu.tabs")
-local debug = OperationOne.require("core.debug")
+local tabs = June.require("menu.tabs")
+local debug = June.require("core.debug")
 
 local M = {}
 local initialized = false

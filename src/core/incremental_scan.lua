@@ -1,6 +1,6 @@
 --[[ Time-budgeted scans — spread heavy workspace work across frames. ]]
 
-local debug = OperationOne.require("core.debug")
+local debug = June.require("core.debug")
 
 local M = {}
 

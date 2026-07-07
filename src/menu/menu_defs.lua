@@ -1,4 +1,4 @@
-local menu_util = OperationOne.require("core.menu_util")
+local menu_util = June.require("core.menu_util")
 
 local M = {}
 

@@ -1,6 +1,6 @@
 --[[ Gadget ownership — mirrors Util.ownership from game scripts (UserId / Team attributes). ]]
 
-local env = OperationOne.require("core.env")
+local env = June.require("core.env")
 
 local M = {}
 

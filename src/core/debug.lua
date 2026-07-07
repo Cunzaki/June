@@ -1,4 +1,4 @@
---[[ Operation One debug — off by default. Set OperationOne.debug = true for logs. ]]
+--[[ June debug — off by default. Set June.debug = true for logs. ]]
 
 local M = {}
 
@@ -6,21 +6,21 @@ local seen_errors = {}
 local frame_count = 0
 
 function M.enabled()
-    return OperationOne and OperationOne.debug == true
+    return June and June.debug == true
 end
 
 function M.verbose()
-    return OperationOne and OperationOne.debug_verbose == true
+    return June and June.debug_verbose == true
 end
 
 function M.log(msg)
     if not M.enabled() then return end
-    print("[OperationOne] " .. tostring(msg))
+    print("[June] " .. tostring(msg))
 end
 
 function M.warn(msg)
     if not M.enabled() then return end
-    print("[OperationOne WARN] " .. tostring(msg))
+    print("[June WARN] " .. tostring(msg))
 end
 
 function M.warn_once(key, msg)
@@ -33,7 +33,7 @@ function M.error_once(key, err)
     seen_errors[key] = (seen_errors[key] or 0) + 1
     local count = seen_errors[key]
     local suffix = count > 1 and (" (x" .. count .. ")") or ""
-    print("[OperationOne ERROR][" .. key .. "] " .. tostring(err) .. suffix)
+    print("[June ERROR][" .. key .. "] " .. tostring(err) .. suffix)
     if debug and debug.traceback then
         print(debug.traceback(err, 2))
     end
@@ -49,13 +49,24 @@ function M.guard(key, fn, ...)
     return a, b, c
 end
 
+function M.tick_frame()
+    frame_count = frame_count + 1
+end
+
+function M.traceback(err, level)
+    if debug and debug.traceback then
+        return debug.traceback(err, level or 2)
+    end
+    return tostring(err)
+end
+
 function M.register_frame_hook(fn)
     if type(fn) ~= "function" then
         M.error_once("frame_hook", "on_frame handler is not a function")
         return false
     end
 
-    -- Vector only invokes global on_frame (see April/docs/API.md).
+    -- Vector only invokes global on_frame.
     -- callbacks.add / draw.callback stack on reload and draw everything twice.
     _G.on_frame = fn
 
@@ -64,10 +75,6 @@ function M.register_frame_hook(fn)
     end
 
     return true
-end
-
-function M.tick_frame()
-    frame_count = frame_count + 1
 end
 
 return M

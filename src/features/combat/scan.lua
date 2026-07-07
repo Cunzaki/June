@@ -1,10 +1,10 @@
-local constants = OperationOne.require("core.constants")
-local settings = OperationOne.require("core.settings")
-local cache = OperationOne.require("core.cache")
-local world_scan = OperationOne.require("game.world_scan")
-local draw_util = OperationOne.require("core.draw_util")
-local shootable_gadgets = OperationOne.require("game.shootable_gadgets")
-local vis_util = OperationOne.require("core.vis_util")
+local constants = June.require("core.constants")
+local settings = June.require("core.settings")
+local cache = June.require("core.cache")
+local world_scan = June.require("game.world_scan")
+local draw_util = June.require("core.draw_util")
+local shootable_gadgets = June.require("game.shootable_gadgets")
+local vis_util = June.require("core.vis_util")
 
 local sqrt, min, max = constants.sqrt, constants.min, constants.max
 local DIST = constants.DIST

@@ -1,8 +1,8 @@
-local constants = OperationOne.require("core.constants")
-local settings = OperationOne.require("core.settings")
-local cache = OperationOne.require("core.cache")
-local draw_util = OperationOne.require("core.draw_util")
-local shootable_gadgets = OperationOne.require("game.shootable_gadgets")
+local constants = June.require("core.constants")
+local settings = June.require("core.settings")
+local cache = June.require("core.cache")
+local draw_util = June.require("core.draw_util")
+local shootable_gadgets = June.require("game.shootable_gadgets")
 
 local sqrt = constants.sqrt
 local AIM_TARGET = constants.AIM_TARGET

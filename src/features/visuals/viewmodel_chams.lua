@@ -1,6 +1,6 @@
-local settings = OperationOne.require("core.settings")
-local cache = OperationOne.require("core.cache")
-local draw_util = OperationOne.require("core.draw_util")
+local settings = June.require("core.settings")
+local cache = June.require("core.cache")
+local draw_util = June.require("core.draw_util")
 
 local M = {}
 local s = settings.s

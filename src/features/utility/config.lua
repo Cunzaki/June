@@ -1,10 +1,10 @@
-local menu_defs = OperationOne.require("menu.menu_defs")
-local menu_util = OperationOne.require("core.menu_util")
+local menu_defs = June.require("menu.menu_defs")
+local menu_util = June.require("core.menu_util")
 
 local M = {}
 local menu_items = menu_defs.menu_items
 
-local AUTOLOAD_FILE = 'AnxietyAutoload.txt'
+local AUTOLOAD_FILE = 'JuneAutoload.txt'
 
 local function cfg_path(name)
     if not name or name == '' then name = 'default' end
@@ -19,7 +19,7 @@ local function save_cfg(name)
     local path = cfg_path(cfg_name)
     local f = io.open(path, 'w')
     if not f then
-        print('[Anxiety] Save failed - could not open: ' .. path)
+        print('[June] Save failed - could not open: ' .. path)
         return false
     end
     for _, m in ipairs(menu_items) do
@@ -63,7 +63,7 @@ local function save_cfg(name)
     -- Always write autoload marker
     local af = io.open(AUTOLOAD_FILE, 'w')
     if af then af:write(cfg_name) af:close() end
-    print('[Anxiety] Config saved: ' .. path)
+    print('[June] Config saved: ' .. path)
     return true
 end
 
@@ -127,7 +127,7 @@ local function load_cfg(name)
         ::continue::
     end
     if count > 0 then
-        print('[Anxiety] Config loaded: ' .. path .. ' (' .. count .. ' values)')
+        print('[June] Config loaded: ' .. path .. ' (' .. count .. ' values)')
     end
     return true
 end
@@ -148,7 +148,7 @@ function M.register_menu()
 end
 
 function M.autoload()
-    -- Autoload on startup: try AnxietyAutoload.txt first, then fallback to default
+    -- Autoload on startup: try JuneAutoload.txt first, then fallback to default
     local _af = io.open(AUTOLOAD_FILE, 'r')
     if _af then
         local _aname = _af:read('*l')
