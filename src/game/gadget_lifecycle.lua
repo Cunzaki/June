@@ -3,6 +3,8 @@
     Placeables/throwables: leave Workspace when destroyed (Garbage pool).
 ]]
 
+local env = June.require("core.env")
+
 local M = {}
 
 local CAMERA_MODELS = {
@@ -130,7 +132,8 @@ function M.is_workspace_placed(obj, ws)
     if ws then
         return parent == ws
     end
-    return parent and (parent.ClassName == "Workspace" or parent == game.Workspace)
+    local ws_ref = ws or env.get_workspace()
+    return parent and (parent.ClassName == "Workspace" or parent == ws_ref)
 end
 
 function M.is_broken(obj, item, anchor_part)

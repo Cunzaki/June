@@ -11,10 +11,10 @@ Player ESP, world gadget ESP, aimbot, silent aim, configs, and more — all from
 Paste this in Vector and execute:
 
 ```lua
-utility.load_url("https://raw.githubusercontent.com/Cunzaki/June/refs/heads/main/june.lua")
+utility.load_url("https://raw.githubusercontent.com/Cunzaki/April-Operation-One/refs/heads/main/june.lua")
 ```
 
-Or run [`load.lua`](load.lua) from this repo.
+Or run [`load.lua`](load.lua) from this repo (includes error handling).
 
 Open the menu: **Scripts → June**
 
@@ -71,7 +71,7 @@ Edit files under `src/`, rebuild, and push `june.lua` to GitHub so the loadstrin
 Gadget icons load from:
 
 ```
-https://raw.githubusercontent.com/Cunzaki/June/refs/heads/main/assets/gadgets/{id}.png
+https://raw.githubusercontent.com/Cunzaki/April-Operation-One/refs/heads/main/assets/gadgets/{id}.png
 ```
 
 Regenerate with `npm run assets` before pushing new icons.

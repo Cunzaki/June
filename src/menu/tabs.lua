@@ -2,6 +2,7 @@ local menu_defs = June.require("menu.menu_defs")
 local config = June.require("features.utility.config")
 local settings = June.require("core.settings")
 local cache = June.require("core.cache")
+local env = June.require("core.env")
 local scan = June.require("features.combat.scan")
 local aimbot = June.require("features.combat.aimbot")
 local silent_aim = June.require("features.combat.silent_aim")
@@ -29,7 +30,7 @@ end
 
 function M.update(_dt)
     local s = settings.s
-    cache.ws = game.Workspace
+    cache.ws = env.get_workspace()
     if not cache.ws then
         return
     end

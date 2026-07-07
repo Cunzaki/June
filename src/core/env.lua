@@ -25,8 +25,8 @@ function M.is_valid(inst)
 end
 
 function M.get_workspace()
-    if game and game.Workspace then return game.Workspace end
     if game and game.workspace then return game.workspace end
+    if game and game.Workspace then return game.Workspace end
     return M.safe_call(function() return workspace end)
 end
 

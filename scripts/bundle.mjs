@@ -91,7 +91,10 @@ local ok, err = pcall(function()
         app.on_frame()
     end) then
         debug.error_once("init", "Failed to register on_frame")
+        return
     end
+
+    print("[June] v" .. (June.version or "?") .. " ready — open Scripts → June")
 end)
 
 if not ok then

@@ -1,6 +1,6 @@
 --[[
     June — Project Vector script for Operation One
-    Built: 2026-07-07T09:45:13.473Z
+    Built: 2026-07-07T09:50:08.922Z
 ]]
 
 June = {
@@ -94,8 +94,8 @@ function M.is_valid(inst)
 end
 
 function M.get_workspace()
-    if game and game.Workspace then return game.Workspace end
     if game and game.workspace then return game.workspace end
+    if game and game.Workspace then return game.Workspace end
     return M.safe_call(function() return workspace end)
 end
 
@@ -603,6 +603,8 @@ June._mods["game.gadget_lifecycle"] = (function()
     Placeables/throwables: leave Workspace when destroyed (Garbage pool).
 ]]
 
+local env = June.require("core.env")
+
 local M = {}
 
 local CAMERA_MODELS = {
@@ -730,7 +732,8 @@ function M.is_workspace_placed(obj, ws)
     if ws then
         return parent == ws
     end
-    return parent and (parent.ClassName == "Workspace" or parent == game.Workspace)
+    local ws_ref = ws or env.get_workspace()
+    return parent and (parent.ClassName == "Workspace" or parent == ws_ref)
 end
 
 function M.is_broken(obj, item, anchor_part)
@@ -2952,6 +2955,8 @@ end)()
 June._mods["core.silent_ray"] = (function()
 --[[ Silent raycast hook — Vector API track_silent_target (see docs/API.md). ]]
 
+local env = June.require("core.env")
+
 local M = {}
 
 local hook_ready = false
@@ -3012,8 +3017,9 @@ function M.get_camera_origin()
         end
     end
 
-    if game and game.Workspace then
-        local cam = game.Workspace:FindFirstChild("Camera")
+    local ws = env.get_workspace()
+    if ws then
+        local cam = ws:FindFirstChild("Camera")
         if cam and cam.CFrame and cam.CFrame.Position then
             local pos = cam.CFrame.Position
             return { x = pos.X, y = pos.Y, z = pos.Z }
@@ -5052,6 +5058,7 @@ local menu_defs = June.require("menu.menu_defs")
 local config = June.require("features.utility.config")
 local settings = June.require("core.settings")
 local cache = June.require("core.cache")
+local env = June.require("core.env")
 local scan = June.require("features.combat.scan")
 local aimbot = June.require("features.combat.aimbot")
 local silent_aim = June.require("features.combat.silent_aim")
@@ -5079,7 +5086,7 @@ end
 
 function M.update(_dt)
     local s = settings.s
-    cache.ws = game.Workspace
+    cache.ws = env.get_workspace()
     if not cache.ws then
         return
     end
@@ -5185,7 +5192,10 @@ local ok, err = pcall(function()
         app.on_frame()
     end) then
         debug.error_once("init", "Failed to register on_frame")
+        return
     end
+
+    print("[June] v" .. (June.version or "?") .. " ready — open Scripts → June")
 end)
 
 if not ok then

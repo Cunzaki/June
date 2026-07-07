@@ -1,5 +1,7 @@
 --[[ Silent raycast hook — Vector API track_silent_target (see docs/API.md). ]]
 
+local env = June.require("core.env")
+
 local M = {}
 
 local hook_ready = false
@@ -60,8 +62,9 @@ function M.get_camera_origin()
         end
     end
 
-    if game and game.Workspace then
-        local cam = game.Workspace:FindFirstChild("Camera")
+    local ws = env.get_workspace()
+    if ws then
+        local cam = ws:FindFirstChild("Camera")
         if cam and cam.CFrame and cam.CFrame.Position then
             local pos = cam.CFrame.Position
             return { x = pos.X, y = pos.Y, z = pos.Z }
