@@ -1,5 +1,3 @@
---[[ Time-budgeted scans — spread heavy workspace work across frames. ]]
-
 local debug = June.require("core.debug")
 
 local M = {}

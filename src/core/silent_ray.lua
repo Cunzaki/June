@@ -1,5 +1,3 @@
---[[ Silent raycast hook — Vector API track_silent_target (see docs/API.md). ]]
-
 local env = June.require("core.env")
 
 local M = {}

@@ -1,5 +1,3 @@
---[[ World gadget scan — workspace + map cameras, per-type lifecycle from game dump. ]]
-
 local draw_util = June.require("core.draw_util")
 local world_items = June.require("game.world_items")
 local gadget_team = June.require("game.gadget_team")

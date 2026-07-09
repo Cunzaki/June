@@ -11,8 +11,6 @@ local function process_fov_changer()
     local cur_fov = camera.get_fov()
     if not cur_fov then return end
 
-    -- Strictly enforce 90 FOV.
-    -- We only write to memory if the camera drifted to prevent lag.
     if math.abs(cur_fov - 90) > 0.1 then
         camera.set_fov(90)
     end

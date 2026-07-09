@@ -50,7 +50,7 @@ local function save_cfg(name)
                 f:write(string.format('%s=%.4f,%.4f,%.4f,%.4f\n', m.id, c[1], c[2], c[3], c[4]))
             end
         end
-        -- Inline colorpicker attached to a non-colorpicker item
+
         if m.c and m.t ~= 'colorpicker' then
             local c = menu.get_color(m.id)
             if c and #c >= 4 then
@@ -60,7 +60,7 @@ local function save_cfg(name)
         ::continue::
     end
     f:close()
-    -- Always write autoload marker
+
     local af = io.open(AUTOLOAD_FILE, 'w')
     if af then af:write(cfg_name) af:close() end
     print('[June] Config saved: ' .. path)
@@ -72,7 +72,7 @@ local function load_cfg(name)
     local path = cfg_path(cfg_name)
     local f = io.open(path, 'r')
     if not f then
-        -- Silently fail if file doesn't exist (normal on first run)
+
         return false
     end
     local data = {}
@@ -114,7 +114,7 @@ local function load_cfg(name)
                 end
             end
         end
-        -- Inline colorpicker
+
         if m.c and m.t ~= 'colorpicker' then
             local ckey = m.id .. '_color'
             if data[ckey] then
@@ -148,7 +148,7 @@ function M.register_menu()
 end
 
 function M.autoload()
-    -- Autoload on startup: try JuneAutoload.txt first, then fallback to default
+
     local _af = io.open(AUTOLOAD_FILE, 'r')
     if _af then
         local _aname = _af:read('*l')

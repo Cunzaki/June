@@ -713,11 +713,11 @@ end
 
 function M.draw_part_hull(b, color, style, outline_color)
     if not (b and b.Position and b.Size) then return end
-    
+
     local pos = b.position or b.Position
     local sz = b.size or b.Size
     local rv, uv, lv = b.right_vector, b.up_vector, b.look_vector
-    
+
     if pos and sz and rv and uv and lv then
         local hx, hy, hz = sz.x * 0.5, sz.y * 0.5, sz.z * 0.5
         local corners = {

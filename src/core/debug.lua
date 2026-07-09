@@ -1,5 +1,3 @@
---[[ June debug — off by default. Set June.debug = true for logs. ]]
-
 local M = {}
 
 local seen_errors = {}
@@ -66,8 +64,6 @@ function M.register_frame_hook(fn)
         return false
     end
 
-    -- Vector only invokes global on_frame.
-    -- callbacks.add / draw.callback stack on reload and draw everything twice.
     _G.on_frame = fn
 
     if draw then

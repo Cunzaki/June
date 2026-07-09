@@ -11,16 +11,16 @@ local function draw_crosshair()
     local sz  = s.crosshair_size  or 8
     local gap = s.crosshair_gap   or 3
     local csty = s.crosshair_style or 0
-    if csty == 0 then -- Cross
+    if csty == 0 then
         draw.line(cx - sz - gap, cy, cx - gap, cy, col, 1.5)
         draw.line(cx + gap, cy, cx + sz + gap, cy, col, 1.5)
         draw.line(cx, cy - sz - gap, cx, cy - gap, col, 1.5)
         draw.line(cx, cy + gap, cx, cy + sz + gap, col, 1.5)
-    elseif csty == 1 then -- Dot
+    elseif csty == 1 then
         draw.circle_filled(cx, cy, sz * 0.4, col)
-    elseif csty == 2 then -- Circle
+    elseif csty == 2 then
         draw.circle(cx, cy, sz + gap, col, 48, 1.5)
-    elseif csty == 3 then -- Plus (no gap)
+    elseif csty == 3 then
         draw.line(cx - sz, cy, cx + sz, cy, col, 1.5)
         draw.line(cx, cy - sz, cx, cy + sz, col, 1.5)
     end

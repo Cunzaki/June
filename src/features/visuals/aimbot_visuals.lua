@@ -15,7 +15,7 @@ local function render_aimbot_visuals()
     if s.aimbot_fov_visible then
         local cx, cy, fov, col = cache.screen_w / 2, cache.screen_h / 2, s.aimbot_fov, s.aimbot_fov_visible_color
         local fov_style = s.aimbot_fov_style or 0
-        -- Independent fill layer (drawn before the outline so outline sits on top)
+
         if s.aimbot_fov_fill then
             local fc = s.aimbot_fov_fill_color or {col[1], col[2], col[3], 0.08}
             if fov_style == FOV_STYLE.SQUARE or fov_style == FOV_STYLE.FILLED_SQUARE or fov_style == FOV_STYLE.DASHED then

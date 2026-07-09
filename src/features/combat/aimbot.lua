@@ -16,10 +16,10 @@ local function get_target_bone(p)
     if not p or not p.bones then
         return nil
     end
-    
+
     local pos = nil
     local bone = bone_map[s.aimbot_bone]
-    
+
     if bone then
         pos = p.bones[bone]
     else
@@ -37,19 +37,18 @@ local function get_target_bone(p)
         end
         pos = nb
     end
-    
+
     if not pos then return nil end
-    
-    -- Apply Prediction
+
     if s.aimbot_prediction and p.velocity then
-        local factor = s.aimbot_prediction_val * 0.001 -- Convert to time scale
+        local factor = s.aimbot_prediction_val * 0.001
         return {
             x = pos.x + (p.velocity.x * factor),
             y = pos.y + (p.velocity.y * factor),
             z = pos.z + (p.velocity.z * factor)
         }
     end
-    
+
     return pos
 end
 
@@ -63,22 +62,19 @@ function M.is_target_valid(lt)
     end
     for _, p in ipairs(cache.players) do
         if p.viewmodel == lt.viewmodel then
-            -- Sticky aim bypasses vis-check so target stays locked through brief occlusion
+
             return p.health > 0 and p.dist <= s.aimbot_max_distance
         end
     end
     return false
 end
 
--- Linear smooth-aim with no deadzone.
--- Keeps the smooth divisor at all normal ranges, but guarantees a minimum
--- 0.5 px step toward center so the aimbot always converges all the way.
 function M.smooth_aim(sx, sy, cx, cy, smooth)
     local dx = sx - cx
     local dy = sy - cy
     local mx = dx / smooth
     local my = dy / smooth
-    -- Ensure we always step toward center — eliminates the sub-pixel deadzone
+
     if dx > 0 and mx < 0.5 then mx = 0.5 elseif dx < 0 and mx > -0.5 then mx = -0.5 end
     if dy > 0 and my < 0.5 then my = 0.5 elseif dy < 0 and my > -0.5 then my = -0.5 end
     input.move_mouse(mx, my)
@@ -101,12 +97,11 @@ function M.process_aimbot()
         cache.aim.locked_target = nil
     end
     cache.aim.last_key_state = kd
-    
+
     local lmb_kd = input.is_key_down(0x01)
     local lmb_clicked = lmb_kd and not cache.aim.last_lmb_state
     cache.aim.last_lmb_state = lmb_kd
 
-    -- Sticky Aim: uses normal aimkey and ignores FOV entirely
     local sticky_kd = s.aimbot_sticky and kd
     if not sticky_kd then
         cache.aim.locked_target = nil
@@ -139,16 +134,16 @@ function M.process_aimbot()
             if s.aimbot_flick then
                 if lmb_kd then
                     if lmb_clicked then
-                        -- Initial Snap to Head
+
                         local hb = cache.aim.locked_target.bones and cache.aim.locked_target.bones.head
                         if hb then camera.look_at(hb.x, hb.y, hb.z) end
                     else
-                        -- Smoothed tracking during spray
+
                         smooth_aim(sx, sy, cx, cy, smooth)
                     end
                 end
             else
-                -- Normal non-flick aimbot tracks while aimkey is held
+
                 smooth_aim(sx, sy, cx, cy, smooth)
             end
             return
@@ -179,9 +174,9 @@ function M.process_aimbot()
         ::continue::
     end
     if s.utilities_aimbot then
-        -- If player priority is on and we already found a player, skip gadgets entirely
+
         if s.aimbot_players_priority and best and not best.target.is_utility then
-            -- player already locked — don't consider gadgets
+
         else
         local bl_opts = s.gadget_aim_blacklist or {}
         local bl_labels = {
@@ -242,7 +237,7 @@ function M.process_aimbot()
             end
             ::continue_gadget::
         end
-        end -- player priority check
+        end
     end
     if best then
         cache.aim.current_target = best
@@ -252,16 +247,16 @@ function M.process_aimbot()
         if s.aimbot_flick then
             if lmb_kd then
                 if lmb_clicked then
-                    -- Initial Snap to Head
+
                     local hb = best.target.bones and best.target.bones.head
                     if hb then camera.look_at(hb.x, hb.y, hb.z) end
                 else
-                    -- Smoothed tracking during spray
+
                     smooth_aim(best.screen_x, best.screen_y, cx, cy, smooth)
                 end
             end
         else
-            -- Normal non-flick aimbot tracks while aimkey is held
+
             smooth_aim(best.screen_x, best.screen_y, cx, cy, smooth)
         end
     else

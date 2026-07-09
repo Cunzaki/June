@@ -1,8 +1,3 @@
---[[
-    June — Project Vector script
-    Built: 2026-07-07T09:53:08.082Z
-]]
-
 June = {
     version = "1.0.0",
     debug = false,
@@ -23,8 +18,6 @@ function June.require(path)
     return mod
 end
 
-
--- ── core/constants.lua ──
 June._mods["core.constants"] = (function()
 local M = {}
 
@@ -65,7 +58,6 @@ return M
 
 end)()
 
--- ── core/env.lua ──
 June._mods["core.env"] = (function()
 local M = {}
 
@@ -115,9 +107,7 @@ return M
 
 end)()
 
--- ── core/debug.lua ──
 June._mods["core.debug"] = (function()
---[[ June debug — off by default. Set June.debug = true for logs. ]]
 
 local M = {}
 
@@ -185,8 +175,6 @@ function M.register_frame_hook(fn)
         return false
     end
 
-    -- Vector only invokes global on_frame.
-    -- callbacks.add / draw.callback stack on reload and draw everything twice.
     _G.on_frame = fn
 
     if draw then
@@ -200,7 +188,6 @@ return M
 
 end)()
 
--- ── core/cache.lua ──
 June._mods["core.cache"] = (function()
 local M = {
     players = {},
@@ -273,13 +260,7 @@ return M
 
 end)()
 
--- ── core/menu_util.lua ──
 June._mods["core.menu_util"] = (function()
---[[
-    Vector full-mode grid:
-      menu.add_group(tab, name)           -> left column, new row
-      menu.add_group(tab, name, 0, true) -> right column, same row as previous left
-]]
 
 local M = {}
 
@@ -333,9 +314,7 @@ return M
 
 end)()
 
--- ── core/incremental_scan.lua ──
 June._mods["core.incremental_scan"] = (function()
---[[ Time-budgeted scans — spread heavy workspace work across frames. ]]
 
 local debug = June.require("core.debug")
 
@@ -434,7 +413,6 @@ return M
 
 end)()
 
--- ── game/world_items.lua ──
 June._mods["game.world_items"] = (function()
 local M = {}
 
@@ -497,9 +475,7 @@ return M
 
 end)()
 
--- ── game/gadget_team.lua ──
 June._mods["game.gadget_team"] = (function()
---[[ Gadget ownership — mirrors Util.ownership from game scripts (UserId / Team attributes). ]]
 
 local env = June.require("core.env")
 
@@ -596,12 +572,7 @@ return M
 
 end)()
 
--- ── game/gadget_lifecycle.lua ──
 June._mods["game.gadget_lifecycle"] = (function()
---[[ Gadget alive/broken rules derived from game decompiled scripts.
-    Cameras: Disabled attribute, Cam/Dot transparency (Breakable/Electronic states).
-    Placeables/throwables: leave Workspace when destroyed (Garbage pool).
-]]
 
 local env = June.require("core.env")
 
@@ -856,16 +827,10 @@ return M
 
 end)()
 
--- ── game/shootable_gadgets.lua ──
 June._mods["game.shootable_gadgets"] = (function()
---[[ Shootable / destroyable gadgets for gadget aimbot + silent gadget aim.
-    Sources: dump/scripts — StateObject Breakable (cameras, placeables) and Drone Humanoid health.
-    Excludes round objectives (Bomb/Defuser) and throwables (grenades).
-]]
 
 local M = {}
 
--- Workspace model names that bullets can destroy or damage
 M.SHOOTABLE_MODELS = {
     Drone = true,
     Claymore = true,
@@ -952,7 +917,7 @@ function M.is_shootable_entry(w)
 
     local model_name = w.kind or (w.item and (w.item.name or w.item.model_name)) or (w.obj and w.obj.Name)
     if M.is_shootable_model(model_name) then
-        -- fall through
+
     elseif not M.is_shootable_label(w.label) then
         return false
     end
@@ -969,7 +934,6 @@ return M
 
 end)()
 
--- ── menu/menu_defs.lua ──
 June._mods["menu.menu_defs"] = (function()
 local menu_util = June.require("core.menu_util")
 
@@ -1647,7 +1611,6 @@ return M
 
 end)()
 
--- ── core/settings.lua ──
 June._mods["core.settings"] = (function()
 local menu_defs = June.require("menu.menu_defs")
 local world_items = June.require("game.world_items")
@@ -1698,7 +1661,6 @@ return M
 
 end)()
 
--- ── core/draw_util.lua ──
 June._mods["core.draw_util"] = (function()
 local constants = June.require("core.constants")
 local settings = June.require("core.settings")
@@ -2415,11 +2377,11 @@ end
 
 function M.draw_part_hull(b, color, style, outline_color)
     if not (b and b.Position and b.Size) then return end
-    
+
     local pos = b.position or b.Position
     local sz = b.size or b.Size
     local rv, uv, lv = b.right_vector, b.up_vector, b.look_vector
-    
+
     if pos and sz and rv and uv and lv then
         local hx, hy, hz = sz.x * 0.5, sz.y * 0.5, sz.z * 0.5
         local corners = {
@@ -2522,9 +2484,7 @@ return M
 
 end)()
 
--- ── game/world_scan.lua ──
 June._mods["game.world_scan"] = (function()
---[[ World gadget scan — workspace + map cameras, per-type lifecycle from game dump. ]]
 
 local draw_util = June.require("core.draw_util")
 local world_items = June.require("game.world_items")
@@ -2951,9 +2911,7 @@ return M
 
 end)()
 
--- ── core/silent_ray.lua ──
 June._mods["core.silent_ray"] = (function()
---[[ Silent raycast hook — Vector API track_silent_target (see docs/API.md). ]]
 
 local env = June.require("core.env")
 
@@ -3098,9 +3056,7 @@ return M
 
 end)()
 
--- ── core/vis_util.lua ──
 June._mods["core.vis_util"] = (function()
---[[ Line-of-sight helpers — raycast.cast (fail-closed) with gadget target matching. ]]
 
 local silent_ray = June.require("core.silent_ray")
 
@@ -3189,9 +3145,7 @@ return M
 
 end)()
 
--- ── features/combat/silent_resolve.lua ──
 June._mods["features.combat.silent_resolve"] = (function()
---[[ Silent ray origin — camera to target (hitscan). ]]
 
 local silent_ray = June.require("core.silent_ray")
 
@@ -3214,7 +3168,6 @@ return M
 
 end)()
 
--- ── features/utility/config.lua ──
 June._mods["features.utility.config"] = (function()
 local menu_defs = June.require("menu.menu_defs")
 local menu_util = June.require("core.menu_util")
@@ -3268,7 +3221,7 @@ local function save_cfg(name)
                 f:write(string.format('%s=%.4f,%.4f,%.4f,%.4f\n', m.id, c[1], c[2], c[3], c[4]))
             end
         end
-        -- Inline colorpicker attached to a non-colorpicker item
+
         if m.c and m.t ~= 'colorpicker' then
             local c = menu.get_color(m.id)
             if c and #c >= 4 then
@@ -3278,7 +3231,7 @@ local function save_cfg(name)
         ::continue::
     end
     f:close()
-    -- Always write autoload marker
+
     local af = io.open(AUTOLOAD_FILE, 'w')
     if af then af:write(cfg_name) af:close() end
     print('[June] Config saved: ' .. path)
@@ -3290,7 +3243,7 @@ local function load_cfg(name)
     local path = cfg_path(cfg_name)
     local f = io.open(path, 'r')
     if not f then
-        -- Silently fail if file doesn't exist (normal on first run)
+
         return false
     end
     local data = {}
@@ -3332,7 +3285,7 @@ local function load_cfg(name)
                 end
             end
         end
-        -- Inline colorpicker
+
         if m.c and m.t ~= 'colorpicker' then
             local ckey = m.id .. '_color'
             if data[ckey] then
@@ -3366,7 +3319,7 @@ function M.register_menu()
 end
 
 function M.autoload()
-    -- Autoload on startup: try JuneAutoload.txt first, then fallback to default
+
     local _af = io.open(AUTOLOAD_FILE, 'r')
     if _af then
         local _aname = _af:read('*l')
@@ -3388,7 +3341,6 @@ return M
 
 end)()
 
--- ── features/combat/scan.lua ──
 June._mods["features.combat.scan"] = (function()
 local constants = June.require("core.constants")
 local settings = June.require("core.settings")
@@ -3889,7 +3841,6 @@ return M
 
 end)()
 
--- ── features/combat/aimbot.lua ──
 June._mods["features.combat.aimbot"] = (function()
 local constants = June.require("core.constants")
 local settings = June.require("core.settings")
@@ -3909,10 +3860,10 @@ local function get_target_bone(p)
     if not p or not p.bones then
         return nil
     end
-    
+
     local pos = nil
     local bone = bone_map[s.aimbot_bone]
-    
+
     if bone then
         pos = p.bones[bone]
     else
@@ -3930,19 +3881,18 @@ local function get_target_bone(p)
         end
         pos = nb
     end
-    
+
     if not pos then return nil end
-    
-    -- Apply Prediction
+
     if s.aimbot_prediction and p.velocity then
-        local factor = s.aimbot_prediction_val * 0.001 -- Convert to time scale
+        local factor = s.aimbot_prediction_val * 0.001
         return {
             x = pos.x + (p.velocity.x * factor),
             y = pos.y + (p.velocity.y * factor),
             z = pos.z + (p.velocity.z * factor)
         }
     end
-    
+
     return pos
 end
 
@@ -3956,22 +3906,19 @@ function M.is_target_valid(lt)
     end
     for _, p in ipairs(cache.players) do
         if p.viewmodel == lt.viewmodel then
-            -- Sticky aim bypasses vis-check so target stays locked through brief occlusion
+
             return p.health > 0 and p.dist <= s.aimbot_max_distance
         end
     end
     return false
 end
 
--- Linear smooth-aim with no deadzone.
--- Keeps the smooth divisor at all normal ranges, but guarantees a minimum
--- 0.5 px step toward center so the aimbot always converges all the way.
 function M.smooth_aim(sx, sy, cx, cy, smooth)
     local dx = sx - cx
     local dy = sy - cy
     local mx = dx / smooth
     local my = dy / smooth
-    -- Ensure we always step toward center — eliminates the sub-pixel deadzone
+
     if dx > 0 and mx < 0.5 then mx = 0.5 elseif dx < 0 and mx > -0.5 then mx = -0.5 end
     if dy > 0 and my < 0.5 then my = 0.5 elseif dy < 0 and my > -0.5 then my = -0.5 end
     input.move_mouse(mx, my)
@@ -3994,12 +3941,11 @@ function M.process_aimbot()
         cache.aim.locked_target = nil
     end
     cache.aim.last_key_state = kd
-    
+
     local lmb_kd = input.is_key_down(0x01)
     local lmb_clicked = lmb_kd and not cache.aim.last_lmb_state
     cache.aim.last_lmb_state = lmb_kd
 
-    -- Sticky Aim: uses normal aimkey and ignores FOV entirely
     local sticky_kd = s.aimbot_sticky and kd
     if not sticky_kd then
         cache.aim.locked_target = nil
@@ -4032,16 +3978,16 @@ function M.process_aimbot()
             if s.aimbot_flick then
                 if lmb_kd then
                     if lmb_clicked then
-                        -- Initial Snap to Head
+
                         local hb = cache.aim.locked_target.bones and cache.aim.locked_target.bones.head
                         if hb then camera.look_at(hb.x, hb.y, hb.z) end
                     else
-                        -- Smoothed tracking during spray
+
                         smooth_aim(sx, sy, cx, cy, smooth)
                     end
                 end
             else
-                -- Normal non-flick aimbot tracks while aimkey is held
+
                 smooth_aim(sx, sy, cx, cy, smooth)
             end
             return
@@ -4072,9 +4018,9 @@ function M.process_aimbot()
         ::continue::
     end
     if s.utilities_aimbot then
-        -- If player priority is on and we already found a player, skip gadgets entirely
+
         if s.aimbot_players_priority and best and not best.target.is_utility then
-            -- player already locked — don't consider gadgets
+
         else
         local bl_opts = s.gadget_aim_blacklist or {}
         local bl_labels = {
@@ -4135,7 +4081,7 @@ function M.process_aimbot()
             end
             ::continue_gadget::
         end
-        end -- player priority check
+        end
     end
     if best then
         cache.aim.current_target = best
@@ -4145,16 +4091,16 @@ function M.process_aimbot()
         if s.aimbot_flick then
             if lmb_kd then
                 if lmb_clicked then
-                    -- Initial Snap to Head
+
                     local hb = best.target.bones and best.target.bones.head
                     if hb then camera.look_at(hb.x, hb.y, hb.z) end
                 else
-                    -- Smoothed tracking during spray
+
                     smooth_aim(best.screen_x, best.screen_y, cx, cy, smooth)
                 end
             end
         else
-            -- Normal non-flick aimbot tracks while aimkey is held
+
             smooth_aim(best.screen_x, best.screen_y, cx, cy, smooth)
         end
     else
@@ -4175,7 +4121,6 @@ return M
 
 end)()
 
--- ── features/combat/silent_aim.lua ──
 June._mods["features.combat.silent_aim"] = (function()
 local constants = June.require("core.constants")
 local settings = June.require("core.settings")
@@ -4587,7 +4532,6 @@ return M
 
 end)()
 
--- ── features/visuals/player_esp.lua ──
 June._mods["features.visuals.player_esp"] = (function()
 local constants = June.require("core.constants")
 local settings = June.require("core.settings")
@@ -4777,7 +4721,6 @@ return M
 
 end)()
 
--- ── features/visuals/world_esp.lua ──
 June._mods["features.visuals.world_esp"] = (function()
 local settings = June.require("core.settings")
 local cache = June.require("core.cache")
@@ -4880,7 +4823,6 @@ return M
 
 end)()
 
--- ── features/visuals/aimbot_visuals.lua ──
 June._mods["features.visuals.aimbot_visuals"] = (function()
 local constants = June.require("core.constants")
 local settings = June.require("core.settings")
@@ -4899,7 +4841,7 @@ local function render_aimbot_visuals()
     if s.aimbot_fov_visible then
         local cx, cy, fov, col = cache.screen_w / 2, cache.screen_h / 2, s.aimbot_fov, s.aimbot_fov_visible_color
         local fov_style = s.aimbot_fov_style or 0
-        -- Independent fill layer (drawn before the outline so outline sits on top)
+
         if s.aimbot_fov_fill then
             local fc = s.aimbot_fov_fill_color or {col[1], col[2], col[3], 0.08}
             if fov_style == FOV_STYLE.SQUARE or fov_style == FOV_STYLE.FILLED_SQUARE or fov_style == FOV_STYLE.DASHED then
@@ -4978,7 +4920,6 @@ return M
 
 end)()
 
--- ── features/visuals/crosshair.lua ──
 June._mods["features.visuals.crosshair"] = (function()
 local settings = June.require("core.settings")
 local cache = June.require("core.cache")
@@ -4993,16 +4934,16 @@ local function draw_crosshair()
     local sz  = s.crosshair_size  or 8
     local gap = s.crosshair_gap   or 3
     local csty = s.crosshair_style or 0
-    if csty == 0 then -- Cross
+    if csty == 0 then
         draw.line(cx - sz - gap, cy, cx - gap, cy, col, 1.5)
         draw.line(cx + gap, cy, cx + sz + gap, cy, col, 1.5)
         draw.line(cx, cy - sz - gap, cx, cy - gap, col, 1.5)
         draw.line(cx, cy + gap, cx, cy + sz + gap, col, 1.5)
-    elseif csty == 1 then -- Dot
+    elseif csty == 1 then
         draw.circle_filled(cx, cy, sz * 0.4, col)
-    elseif csty == 2 then -- Circle
+    elseif csty == 2 then
         draw.circle(cx, cy, sz + gap, col, 48, 1.5)
-    elseif csty == 3 then -- Plus (no gap)
+    elseif csty == 3 then
         draw.line(cx - sz, cy, cx + sz, cy, col, 1.5)
         draw.line(cx, cy - sz, cx, cy + sz, col, 1.5)
     end
@@ -5014,7 +4955,6 @@ return M
 
 end)()
 
--- ── features/utility/keybind_window.lua ──
 June._mods["features.utility.keybind_window"] = (function()
 local settings = June.require("core.settings")
 
@@ -5052,7 +4992,6 @@ return M
 
 end)()
 
--- ── menu/tabs.lua ──
 June._mods["menu.tabs"] = (function()
 local menu_defs = June.require("menu.menu_defs")
 local config = June.require("features.utility.config")
@@ -5140,7 +5079,6 @@ return M
 
 end)()
 
--- ── app.lua ──
 June._mods["app"] = (function()
 local tabs = June.require("menu.tabs")
 local debug = June.require("core.debug")

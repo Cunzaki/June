@@ -9,13 +9,13 @@ local normalize_chams_style = draw_util.normalize_chams_style
 
 local function render_viewmodel_chams()
     if not (s.vm_arms_chams or s.vm_weapon_chams) then return end
-    
+
     local vms = cache.ws:FindFirstChild("Viewmodels")
     local local_vm = vms and vms:FindFirstChild("LocalViewmodel")
     if not local_vm then return end
-    
+
     local arm_parts = {arm1=true, arm2=true, shoulder1=true, shoulder2=true, hand1=true, hand2=true}
-    
+
     local function process_model(model)
         for _, child in ipairs(model:GetChildren()) do
             if child:IsA("BasePart") then
@@ -29,7 +29,7 @@ local function render_viewmodel_chams()
             end
         end
     end
-    
+
     process_model(local_vm)
 end
 

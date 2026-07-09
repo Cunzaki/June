@@ -1,5 +1,3 @@
---[[ Line-of-sight helpers — raycast.cast (fail-closed) with gadget target matching. ]]
-
 local silent_ray = June.require("core.silent_ray")
 
 local M = {}

@@ -1,11 +1,5 @@
---[[ Shootable / destroyable gadgets for gadget aimbot + silent gadget aim.
-    Sources: dump/scripts — StateObject Breakable (cameras, placeables) and Drone Humanoid health.
-    Excludes round objectives (Bomb/Defuser) and throwables (grenades).
-]]
-
 local M = {}
 
--- Workspace model names that bullets can destroy or damage
 M.SHOOTABLE_MODELS = {
     Drone = true,
     Claymore = true,
@@ -92,7 +86,7 @@ function M.is_shootable_entry(w)
 
     local model_name = w.kind or (w.item and (w.item.name or w.item.model_name)) or (w.obj and w.obj.Name)
     if M.is_shootable_model(model_name) then
-        -- fall through
+
     elseif not M.is_shootable_label(w.label) then
         return false
     end

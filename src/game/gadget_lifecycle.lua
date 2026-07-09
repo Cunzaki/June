@@ -1,8 +1,3 @@
---[[ Gadget alive/broken rules derived from game decompiled scripts.
-    Cameras: Disabled attribute, Cam/Dot transparency (Breakable/Electronic states).
-    Placeables/throwables: leave Workspace when destroyed (Garbage pool).
-]]
-
 local env = June.require("core.env")
 
 local M = {}

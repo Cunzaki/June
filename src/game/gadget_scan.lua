@@ -1,5 +1,3 @@
---[[ Gadget + camera discovery for world ESP / utilities aimbot. ]]
-
 local draw_util = June.require("core.draw_util")
 local world_items = June.require("game.world_items")
 

@@ -1,8 +1,3 @@
---[[
-    One HTTPS URL per asset — docs/API.md Images section.
-    Assets: https://github.com/Cunzaki/June/tree/main/assets
-]]
-
 local M = {}
 
 M.CDN_BASE = "https://raw.githubusercontent.com/Cunzaki/June/refs/heads/main/assets"
