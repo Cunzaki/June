@@ -64,7 +64,7 @@ Edit files under `src/`, rebuild, and push `june.lua` to GitHub so the loadstrin
 | [`scripts/`](scripts/) | Bundle + asset tools |
 | [`assets/`](assets/) | Gadget icons served via GitHub CDN |
 
-**Local only (gitignored):** `dump/`, `references/`, `Script 1.lua`, `node_modules/`
+**Local only (gitignored):** `dump/`, `node_modules/`
 
 ### Asset CDN
 
