@@ -226,7 +226,7 @@ function M.register()
     _wired = true
 
     gpu_chams.register_owner("players", {
-        rescan_ms = 350,
+        rescan_ms = 450,
         is_active = players_active,
         style = function()
             return gpu_chams.mode_index(PLAYER_MODE, 0), gpu_chams.color_index(PLAYER_COLOR, 0)
@@ -235,7 +235,7 @@ function M.register()
     })
 
     gpu_chams.register_owner("world", {
-        rescan_ms = 500,
+        rescan_ms = 450,
         is_active = world_active,
         style = function()
             return gpu_chams.mode_index(WORLD_MODE, 0), gpu_chams.color_index(WORLD_COLOR, 0)
@@ -260,8 +260,8 @@ function M.update()
     if not _wired then
         M.register()
     end
-    gpu_chams.sync_owner("players")
-    gpu_chams.sync_owner("world")
+    -- One coalesced sync — never sync owners separately (causes color flash).
+    gpu_chams.sync_all(false)
 end
 
 function M.update_visibility(s)

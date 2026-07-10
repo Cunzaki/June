@@ -1,6 +1,6 @@
 --[[
     June — Project Vector script
-    Built: 2026-07-10T13:19:48.668Z
+    Built: 2026-07-10T13:41:02.955Z
 ]]
 
 June = {
@@ -1891,7 +1891,7 @@ local owners = {}
 local owner_order = {}
 local rebuild_busy = false
 local last_global_rebuild = 0
-local MIN_REBUILD_GAP_MS = 250
+local MIN_REBUILD_GAP_MS = 400
 
 function M.available()
     return exploits ~= nil
@@ -2216,62 +2216,147 @@ function M.refresh_owner_style(id)
         M.clear_owner(id)
         return
     end
+    -- Style change must re-stamp; one global rebuild keeps multi-color owners stable.
     M.rebuild_all()
 end
 
-function M.sync_owner(id, force)
+-- Collect desired address sets for every owner without applying.
+-- Returns: need_rebuild, pending_adds { [owner_id] = { addr = true, ... } }
+local function collect_all_backs(force)
+    local now = now_ms()
+    local need_rebuild = false
+    local pending_adds = {}
+
+    for _, id in ipairs(owner_order) do
+        local owner = owners[id]
+        if not owner then
+            goto continue
+        end
+
+        if not owner.is_active() then
+            if owner.was_active or next(owner.applied) ~= nil then
+                need_rebuild = true
+                owner.applied = {}
+                owner.was_active = false
+                owner.last_rescan = 0
+                owner.missing = {}
+            end
+            goto continue
+        end
+
+        local due = force
+            or owner.last_rescan == 0
+            or (now - owner.last_rescan) >= owner.rescan_ms
+        if not due then
+            owner.was_active = true
+            goto continue
+        end
+
+        owner.last_rescan = now
+        owner.was_active = true
+        owner.missing = owner.missing or {}
+
+        local back = {}
+        -- Collect only — apply phase sets style per owner.
+        local ok = pcall(owner.collect, back)
+        if not ok then
+            goto continue
+        end
+
+        -- Grace: keep addresses missing for one rescan to avoid edge flicker.
+        local front = owner.applied
+        for addr in pairs(front) do
+            if not back[addr] then
+                local misses = (owner.missing[addr] or 0) + 1
+                owner.missing[addr] = misses
+                if misses < 2 then
+                    back[addr] = true
+                end
+            else
+                owner.missing[addr] = nil
+            end
+        end
+        for addr in pairs(back) do
+            if front[addr] then
+                owner.missing[addr] = nil
+            end
+        end
+
+        if sets_equal(front, back) then
+            goto continue
+        end
+
+        if has_removed(front, back) or next(front) == nil then
+            need_rebuild = true
+            owner._pending_back = back
+        else
+            local adds = {}
+            for addr in pairs(back) do
+                if not front[addr] then
+                    adds[addr] = true
+                end
+            end
+            if next(adds) then
+                pending_adds[id] = adds
+                owner._pending_back = back
+            end
+        end
+        ::continue::
+    end
+
+    return need_rebuild, pending_adds
+end
+
+-- Single per-frame sync for all owners.
+-- Prevents multi-color flashing: at most one RevertChams, then each owner
+-- pushes its own mode/color and stamps its parts in order.
+function M.sync_all(force)
     if not M.available() or rebuild_busy then
         return
     end
-    local owner = owners[id]
-    if not owner then
-        return
-    end
 
-    if not owner.is_active() then
-        if owner.was_active or next(owner.applied) ~= nil then
-            M.clear_owner(id)
+    local need_rebuild, pending_adds = collect_all_backs(force)
+
+    if need_rebuild then
+        if M.rebuild_all() then
+            for _, id in ipairs(owner_order) do
+                local owner = owners[id]
+                if owner then
+                    owner._pending_back = nil
+                    owner.missing = {}
+                end
+            end
         end
         return
     end
 
-    local now = now_ms()
-    if not force and owner.last_rescan ~= 0 and (now - owner.last_rescan) < owner.rescan_ms then
-        owner.was_active = true
-        return
-    end
-    owner.last_rescan = now
-    owner.was_active = true
-
-    local back = {}
-    local mode, color = owner.style()
-    push_style(mode, color)
-    local ok = pcall(owner.collect, back)
-    if not ok then
-        return
-    end
-
-    local front = owner.applied
-
-    if sets_equal(front, back) then
-        return
-    end
-
-    if has_removed(front, back) or next(front) == nil then
-        owner.applied = {}
-        if not M.rebuild_all() then
-            owner.applied = back
-        end
-        return
-    end
-
-    for addr, _ in pairs(back) do
-        if not front[addr] then
-            pcall(exploits.ApplyChamsToInstance, addr)
-            front[addr] = true
+    -- Incremental additions only — stamp with each owner's style, never revert.
+    for _, id in ipairs(owner_order) do
+        local adds = pending_adds[id]
+        local owner = owners[id]
+        if owner and adds and next(adds) then
+            local mode, color = owner.style()
+            push_style(mode, color)
+            local front = owner.applied
+            for addr in pairs(adds) do
+                if not front[addr] then
+                    pcall(exploits.ApplyChamsToInstance, addr)
+                    front[addr] = true
+                end
+            end
+            if owner._pending_back then
+                owner.applied = owner._pending_back
+                owner._pending_back = nil
+            else
+                owner.applied = front
+            end
         end
     end
-    owner.applied = front
+end
+
+function M.sync_owner(id, force)
+    -- Always coalesce through sync_all so multi-owner colors stay stable.
+    M.sync_all(force == true)
 end
 
 function M.wire_style_controls(owner_id, mode_id, color_id)
@@ -5840,7 +5925,7 @@ function M.register()
     _wired = true
 
     gpu_chams.register_owner("players", {
-        rescan_ms = 350,
+        rescan_ms = 450,
         is_active = players_active,
         style = function()
             return gpu_chams.mode_index(PLAYER_MODE, 0), gpu_chams.color_index(PLAYER_COLOR, 0)
@@ -5849,7 +5934,7 @@ function M.register()
     })
 
     gpu_chams.register_owner("world", {
-        rescan_ms = 500,
+        rescan_ms = 450,
         is_active = world_active,
         style = function()
             return gpu_chams.mode_index(WORLD_MODE, 0), gpu_chams.color_index(WORLD_COLOR, 0)
@@ -5874,8 +5959,8 @@ function M.update()
     if not _wired then
         M.register()
     end
-    gpu_chams.sync_owner("players")
-    gpu_chams.sync_owner("world")
+    -- One coalesced sync — never sync owners separately (causes color flash).
+    gpu_chams.sync_all(false)
 end
 
 function M.update_visibility(s)
