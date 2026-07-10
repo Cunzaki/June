@@ -139,12 +139,12 @@ function M.process_aimbot()
                         if hb then camera.look_at(hb.x, hb.y, hb.z) end
                     else
 
-                        smooth_aim(sx, sy, cx, cy, smooth)
+                        M.smooth_aim(sx, sy, cx, cy, smooth)
                     end
                 end
             else
 
-                smooth_aim(sx, sy, cx, cy, smooth)
+                M.smooth_aim(sx, sy, cx, cy, smooth)
             end
             return
         end
@@ -252,12 +252,12 @@ function M.process_aimbot()
                     if hb then camera.look_at(hb.x, hb.y, hb.z) end
                 else
 
-                    smooth_aim(best.screen_x, best.screen_y, cx, cy, smooth)
+                    M.smooth_aim(best.screen_x, best.screen_y, cx, cy, smooth)
                 end
             end
         else
 
-            smooth_aim(best.screen_x, best.screen_y, cx, cy, smooth)
+            M.smooth_aim(best.screen_x, best.screen_y, cx, cy, smooth)
         end
     else
         cache.aim.current_target = nil

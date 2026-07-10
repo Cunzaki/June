@@ -1,3 +1,8 @@
+--[[
+    June — Project Vector script
+    Built: 2026-07-10T12:56:46.758Z
+]]
+
 June = {
     version = "1.0.0",
     debug = false,
@@ -18,6 +23,8 @@ function June.require(path)
     return mod
 end
 
+
+-- ── core/constants.lua ──
 June._mods["core.constants"] = (function()
 local M = {}
 
@@ -58,6 +65,7 @@ return M
 
 end)()
 
+-- ── core/env.lua ──
 June._mods["core.env"] = (function()
 local M = {}
 
@@ -107,8 +115,8 @@ return M
 
 end)()
 
+-- ── core/debug.lua ──
 June._mods["core.debug"] = (function()
-
 local M = {}
 
 local seen_errors = {}
@@ -188,6 +196,7 @@ return M
 
 end)()
 
+-- ── core/cache.lua ──
 June._mods["core.cache"] = (function()
 local M = {
     players = {},
@@ -260,8 +269,8 @@ return M
 
 end)()
 
+-- ── core/menu_util.lua ──
 June._mods["core.menu_util"] = (function()
-
 local M = {}
 
 M.TAB = "June"
@@ -314,8 +323,8 @@ return M
 
 end)()
 
+-- ── core/incremental_scan.lua ──
 June._mods["core.incremental_scan"] = (function()
-
 local debug = June.require("core.debug")
 
 local M = {}
@@ -413,6 +422,7 @@ return M
 
 end)()
 
+-- ── game/world_items.lua ──
 June._mods["game.world_items"] = (function()
 local M = {}
 
@@ -475,8 +485,8 @@ return M
 
 end)()
 
+-- ── game/gadget_team.lua ──
 June._mods["game.gadget_team"] = (function()
-
 local env = June.require("core.env")
 
 local M = {}
@@ -572,8 +582,8 @@ return M
 
 end)()
 
+-- ── game/gadget_lifecycle.lua ──
 June._mods["game.gadget_lifecycle"] = (function()
-
 local env = June.require("core.env")
 
 local M = {}
@@ -827,8 +837,8 @@ return M
 
 end)()
 
+-- ── game/shootable_gadgets.lua ──
 June._mods["game.shootable_gadgets"] = (function()
-
 local M = {}
 
 M.SHOOTABLE_MODELS = {
@@ -934,6 +944,7 @@ return M
 
 end)()
 
+-- ── menu/menu_defs.lua ──
 June._mods["menu.menu_defs"] = (function()
 local menu_util = June.require("core.menu_util")
 
@@ -1611,6 +1622,7 @@ return M
 
 end)()
 
+-- ── core/settings.lua ──
 June._mods["core.settings"] = (function()
 local menu_defs = June.require("menu.menu_defs")
 local world_items = June.require("game.world_items")
@@ -1661,6 +1673,7 @@ return M
 
 end)()
 
+-- ── core/draw_util.lua ──
 June._mods["core.draw_util"] = (function()
 local constants = June.require("core.constants")
 local settings = June.require("core.settings")
@@ -2484,8 +2497,8 @@ return M
 
 end)()
 
+-- ── game/world_scan.lua ──
 June._mods["game.world_scan"] = (function()
-
 local draw_util = June.require("core.draw_util")
 local world_items = June.require("game.world_items")
 local gadget_team = June.require("game.gadget_team")
@@ -2911,8 +2924,8 @@ return M
 
 end)()
 
+-- ── core/silent_ray.lua ──
 June._mods["core.silent_ray"] = (function()
-
 local env = June.require("core.env")
 
 local M = {}
@@ -3056,8 +3069,8 @@ return M
 
 end)()
 
+-- ── core/vis_util.lua ──
 June._mods["core.vis_util"] = (function()
-
 local silent_ray = June.require("core.silent_ray")
 
 local M = {}
@@ -3145,8 +3158,8 @@ return M
 
 end)()
 
+-- ── features/combat/silent_resolve.lua ──
 June._mods["features.combat.silent_resolve"] = (function()
-
 local silent_ray = June.require("core.silent_ray")
 
 local M = {}
@@ -3168,6 +3181,7 @@ return M
 
 end)()
 
+-- ── features/utility/config.lua ──
 June._mods["features.utility.config"] = (function()
 local menu_defs = June.require("menu.menu_defs")
 local menu_util = June.require("core.menu_util")
@@ -3341,6 +3355,7 @@ return M
 
 end)()
 
+-- ── features/combat/scan.lua ──
 June._mods["features.combat.scan"] = (function()
 local constants = June.require("core.constants")
 local settings = June.require("core.settings")
@@ -3841,6 +3856,7 @@ return M
 
 end)()
 
+-- ── features/combat/aimbot.lua ──
 June._mods["features.combat.aimbot"] = (function()
 local constants = June.require("core.constants")
 local settings = June.require("core.settings")
@@ -3983,12 +3999,12 @@ function M.process_aimbot()
                         if hb then camera.look_at(hb.x, hb.y, hb.z) end
                     else
 
-                        smooth_aim(sx, sy, cx, cy, smooth)
+                        M.smooth_aim(sx, sy, cx, cy, smooth)
                     end
                 end
             else
 
-                smooth_aim(sx, sy, cx, cy, smooth)
+                M.smooth_aim(sx, sy, cx, cy, smooth)
             end
             return
         end
@@ -4096,12 +4112,12 @@ function M.process_aimbot()
                     if hb then camera.look_at(hb.x, hb.y, hb.z) end
                 else
 
-                    smooth_aim(best.screen_x, best.screen_y, cx, cy, smooth)
+                    M.smooth_aim(best.screen_x, best.screen_y, cx, cy, smooth)
                 end
             end
         else
 
-            smooth_aim(best.screen_x, best.screen_y, cx, cy, smooth)
+            M.smooth_aim(best.screen_x, best.screen_y, cx, cy, smooth)
         end
     else
         cache.aim.current_target = nil
@@ -4121,6 +4137,7 @@ return M
 
 end)()
 
+-- ── features/combat/silent_aim.lua ──
 June._mods["features.combat.silent_aim"] = (function()
 local constants = June.require("core.constants")
 local settings = June.require("core.settings")
@@ -4532,6 +4549,7 @@ return M
 
 end)()
 
+-- ── features/visuals/player_esp.lua ──
 June._mods["features.visuals.player_esp"] = (function()
 local constants = June.require("core.constants")
 local settings = June.require("core.settings")
@@ -4721,6 +4739,7 @@ return M
 
 end)()
 
+-- ── features/visuals/world_esp.lua ──
 June._mods["features.visuals.world_esp"] = (function()
 local settings = June.require("core.settings")
 local cache = June.require("core.cache")
@@ -4823,6 +4842,7 @@ return M
 
 end)()
 
+-- ── features/visuals/aimbot_visuals.lua ──
 June._mods["features.visuals.aimbot_visuals"] = (function()
 local constants = June.require("core.constants")
 local settings = June.require("core.settings")
@@ -4920,6 +4940,7 @@ return M
 
 end)()
 
+-- ── features/visuals/crosshair.lua ──
 June._mods["features.visuals.crosshair"] = (function()
 local settings = June.require("core.settings")
 local cache = June.require("core.cache")
@@ -4955,6 +4976,7 @@ return M
 
 end)()
 
+-- ── features/utility/keybind_window.lua ──
 June._mods["features.utility.keybind_window"] = (function()
 local settings = June.require("core.settings")
 
@@ -4992,6 +5014,7 @@ return M
 
 end)()
 
+-- ── menu/tabs.lua ──
 June._mods["menu.tabs"] = (function()
 local menu_defs = June.require("menu.menu_defs")
 local config = June.require("features.utility.config")
@@ -5079,6 +5102,7 @@ return M
 
 end)()
 
+-- ── app.lua ──
 June._mods["app"] = (function()
 local tabs = June.require("menu.tabs")
 local debug = June.require("core.debug")
