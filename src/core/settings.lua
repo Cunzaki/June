@@ -21,6 +21,58 @@ function M.on_change(id, fn)
     end
 end
 
+function M.get(id, default)
+    if menu and menu.get then
+        local v = menu.get(id)
+        if v ~= nil then
+            return v
+        end
+    end
+    if M.s[id] ~= nil then
+        return M.s[id]
+    end
+    return default
+end
+
+function M.enabled(id)
+    local v = M.get(id)
+    if v == nil or v == false or v == 0 or v == "false" then
+        return false
+    end
+    return v == true or v == 1
+end
+
+function M.num(id, default)
+    return tonumber(M.get(id, default)) or default or 0
+end
+
+function M.combo_index(id, labels, default)
+    default = default or 0
+    local v = M.get(id, default)
+    if type(v) == "string" then
+        local lower = v:lower()
+        for i, label in ipairs(labels or {}) do
+            if label:lower() == lower then
+                return i - 1
+            end
+        end
+        return default
+    end
+    local n = tonumber(v)
+    if n == nil then
+        return default
+    end
+    if labels and #labels > 0 then
+        if n < 0 then
+            return default
+        end
+        if n >= #labels then
+            return #labels - 1
+        end
+    end
+    return n
+end
+
 function M.sync_settings()
     local s = M.s
     local menu_items = menu_defs.menu_items

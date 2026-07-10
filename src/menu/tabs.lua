@@ -8,6 +8,7 @@ local aimbot = June.require("features.combat.aimbot")
 local silent_aim = June.require("features.combat.silent_aim")
 local player_esp = June.require("features.visuals.player_esp")
 local world_esp = June.require("features.visuals.world_esp")
+local engine_chams = June.require("features.visuals.engine_chams")
 local aimbot_visuals = June.require("features.visuals.aimbot_visuals")
 local crosshair = June.require("features.visuals.crosshair")
 local keybind_window = June.require("features.utility.keybind_window")
@@ -19,6 +20,7 @@ function M.register_all()
     if M._menu_registered then return end
     menu_defs.register_all()
     config.register_menu()
+    engine_chams.register()
     M._menu_registered = true
 end
 
@@ -62,6 +64,7 @@ function M.update(_dt)
     menu.set_visible("silent_fov_fill", s.silent_aim_enabled and s.silent_draw_fov)
     menu.set_visible("silent_gadget_aim", s.silent_aim_enabled)
     menu.set_visible("silent_gadget_team_check", s.silent_aim_enabled and s.silent_gadget_aim)
+    engine_chams.update_visibility(s)
     scan.update_char_models()
     scan.scan_players()
     scan.scan_world()
@@ -69,6 +72,7 @@ function M.update(_dt)
     aimbot.process_toggle("world_enabled", cache.toggles.world, "world_enabled")
     silent_aim.update(_dt)
     aimbot.process_aimbot()
+    engine_chams.update()
 end
 
 function M.draw()

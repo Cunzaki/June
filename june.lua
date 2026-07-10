@@ -1,6 +1,6 @@
 --[[
     June — Project Vector script
-    Built: 2026-07-10T13:02:45.507Z
+    Built: 2026-07-10T13:19:48.668Z
 ]]
 
 June = {
@@ -1344,6 +1344,72 @@ M.menu_items = {
         c = {1, 0.2, 0.2, 1}
     },
     {g = "Players", t = "checkbox", id = "players_team", n = "Show Teammates", v = false, p = "players_enabled"},
+    {g = "Players", t = "separator"},
+    {g = "Players", t = "label", n = "Engine Chams"},
+    {
+        g = "Players",
+        t = "multicombo",
+        id = "players_engine_chams",
+        n = "Player Engine Chams",
+        o = {
+            "Head",
+            "Torso",
+            "Left Arm",
+            "Right Arm",
+            "Left Leg",
+            "Right Leg",
+            "Left Shoulder",
+            "Right Shoulder",
+            "Left Hip",
+            "Right Hip",
+        },
+        v = {false, false, false, false, false, false, false, false, false, false},
+        p = "players_enabled"
+    },
+    {
+        g = "Players",
+        t = "combo",
+        id = "players_engine_chams_mode",
+        n = "Player Chams Mode",
+        o = {"Fill", "Wireframe", "Fill Glow", "Wireframe Glow"},
+        v = 0,
+        p = "players_enabled"
+    },
+    {
+        g = "Players",
+        t = "combo",
+        id = "players_engine_chams_color",
+        n = "Player Chams Color",
+        o = {"Default", "Red", "Green", "Yellow", "Blue", "Magenta", "Cyan"},
+        v = 0,
+        p = "players_enabled"
+    },
+    {
+        g = "Players",
+        t = "slider_int",
+        id = "players_engine_chams_range",
+        n = "Player Chams Range",
+        min = 1,
+        max = 500,
+        v = 250,
+        p = "players_enabled"
+    },
+    {
+        g = "Players",
+        t = "checkbox",
+        id = "players_engine_chams_team_check",
+        n = "Chams Team Check",
+        v = true,
+        p = "players_enabled"
+    },
+    {
+        g = "Players",
+        t = "checkbox",
+        id = "players_engine_chams_vischeck",
+        n = "Chams Visibility Check",
+        v = false,
+        p = "players_enabled"
+    },
     {g = "World", t = "checkbox", id = "world_enabled", n = "Enable World Visuals", v = false, k = 0x74},
     {g = "World", t = "checkbox", id = "world_team_check", n = "Gadget Team Check", v = false, p = "world_enabled"},
     {
@@ -1353,6 +1419,76 @@ M.menu_items = {
         n = "Display Options",
         o = {"Text", "Distance", "3D Box"},
         v = {false, false, false},
+        p = "world_enabled"
+    },
+    {g = "World", t = "separator"},
+    {g = "World", t = "label", n = "Engine Chams"},
+    {
+        g = "World",
+        t = "multicombo",
+        id = "world_engine_chams",
+        n = "World Engine Chams",
+        o = {
+            "Bomb",
+            "Defuser",
+            "Claymore",
+            "Drone",
+            "StunGrenade",
+            "SmokeGrenade",
+            "EMPGrenade",
+            "ImpactGrenade",
+            "BreachCharge",
+            "RemoteC4",
+            "FragGrenade",
+            "StickyCamera",
+            "SignalDisruptor",
+            "HardBreachCharge",
+            "ProximityAlarm",
+            "BarbedWire",
+            "IncendiaryGrenade",
+            "IncendiaryCanister",
+            "BulletproofCamera",
+            "DeployableShield",
+            "ThermiteCharge",
+            "ShockBattery",
+            "NeedleMine",
+            "ToxicCharge",
+            "MetalBarricade",
+            "Map Cam",
+        },
+        v = {
+            false, false, false, false, false, false, false, false, false, false,
+            false, false, false, false, false, false, false, false, false, false,
+            false, false, false, false, false, false,
+        },
+        p = "world_enabled"
+    },
+    {
+        g = "World",
+        t = "combo",
+        id = "world_engine_chams_mode",
+        n = "World Chams Mode",
+        o = {"Fill", "Wireframe", "Fill Glow", "Wireframe Glow"},
+        v = 0,
+        p = "world_enabled"
+    },
+    {
+        g = "World",
+        t = "combo",
+        id = "world_engine_chams_color",
+        n = "World Chams Color",
+        o = {"Default", "Red", "Green", "Yellow", "Blue", "Magenta", "Cyan"},
+        v = 0,
+        p = "world_enabled"
+    },
+    {
+        g = "World",
+        t = "slider_int",
+        id = "world_engine_chams_range",
+        n = "World Chams Range",
+        min = 1,
+        max = 500,
+        v = 250,
         p = "world_enabled"
     },
     {
@@ -1647,6 +1783,58 @@ function M.on_change(id, fn)
     end
 end
 
+function M.get(id, default)
+    if menu and menu.get then
+        local v = menu.get(id)
+        if v ~= nil then
+            return v
+        end
+    end
+    if M.s[id] ~= nil then
+        return M.s[id]
+    end
+    return default
+end
+
+function M.enabled(id)
+    local v = M.get(id)
+    if v == nil or v == false or v == 0 or v == "false" then
+        return false
+    end
+    return v == true or v == 1
+end
+
+function M.num(id, default)
+    return tonumber(M.get(id, default)) or default or 0
+end
+
+function M.combo_index(id, labels, default)
+    default = default or 0
+    local v = M.get(id, default)
+    if type(v) == "string" then
+        local lower = v:lower()
+        for i, label in ipairs(labels or {}) do
+            if label:lower() == lower then
+                return i - 1
+            end
+        end
+        return default
+    end
+    local n = tonumber(v)
+    if n == nil then
+        return default
+    end
+    if labels and #labels > 0 then
+        if n < 0 then
+            return default
+        end
+        if n >= #labels then
+            return #labels - 1
+        end
+    end
+    return n
+end
+
 function M.sync_settings()
     local s = M.s
     local menu_items = menu_defs.menu_items
@@ -1667,6 +1855,443 @@ function M.sync_settings()
     for _, item in ipairs(world_items.world_items) do
         s[item.enabled .. "_color"] = menu.get_color(item.enabled)
     end
+end
+
+return M
+
+end)()
+
+-- ── core/gpu_chams.lua ──
+June._mods["core.gpu_chams"] = (function()
+-- GPU instance chams with a double-buffer applied set.
+-- front (owner.applied) = addresses currently stamped
+-- back  (fresh collect) = addresses that SHOULD be chammed this tick
+-- Removals → RevertChams + rebuild all active owners.
+-- Additions → incremental ApplyChamsToInstance only.
+
+local settings = June.require("core.settings")
+local env = June.require("core.env")
+
+local M = {}
+
+M.MODE_LABELS = { "Fill", "Wireframe", "Fill Glow", "Wireframe Glow" }
+M.COLOR_LABELS = { "Default", "Red", "Green", "Yellow", "Blue", "Magenta", "Cyan" }
+
+local PART_CLASSES = {
+    Part = true,
+    MeshPart = true,
+    WedgePart = true,
+    CornerWedgePart = true,
+    TrussPart = true,
+    UnionOperation = true,
+    NegateOperation = true,
+}
+
+local owners = {}
+local owner_order = {}
+local rebuild_busy = false
+local last_global_rebuild = 0
+local MIN_REBUILD_GAP_MS = 250
+
+function M.available()
+    return exploits ~= nil
+        and type(exploits.ApplyChamsToInstance) == "function"
+        and type(exploits.RevertChams) == "function"
+        and type(exploits.SetChamsMode) == "function"
+        and type(exploits.SetChamsColor) == "function"
+end
+
+function M.is_part(inst)
+    if not inst then
+        return false
+    end
+    local cn = inst.ClassName or inst.class_name
+    if PART_CLASSES[cn] then
+        return true
+    end
+    return env.safe_call(function()
+        if inst.is_a then
+            return inst:is_a("BasePart")
+        end
+        if inst.IsA then
+            return inst:IsA("BasePart")
+        end
+        return false
+    end) == true
+end
+
+function M.instance_addr(inst)
+    if not inst then
+        return nil
+    end
+    return inst.Address or inst.address
+end
+
+function M.color_visible_for_mode(mode)
+    mode = tonumber(mode) or 0
+    return mode == 2 or mode == 3
+end
+
+function M.mode_index(id, default)
+    return settings.combo_index(id, M.MODE_LABELS, default or 0)
+end
+
+function M.color_index(id, default)
+    return settings.combo_index(id, M.COLOR_LABELS, default or 0)
+end
+
+function M.multicombo_selected(id, index)
+    local t = settings.get(id)
+    if type(t) ~= "table" then
+        return false
+    end
+    local v = t[index]
+    return v == true or v == 1
+end
+
+function M.multicombo_any(id, count)
+    for i = 1, count do
+        if M.multicombo_selected(id, i) then
+            return true
+        end
+    end
+    return false
+end
+
+function M.multicombo_defaults(count)
+    local out = {}
+    for i = 1, count do
+        out[i] = false
+    end
+    return out
+end
+
+local function now_ms()
+    return utility and utility.get_tick_count and utility.get_tick_count() or 0
+end
+
+local function push_style(mode, color)
+    pcall(function()
+        exploits.SetChamsMode(mode or 0)
+    end)
+    pcall(function()
+        exploits.SetChamsColor(color or 0)
+    end)
+end
+
+local function any_other_active(except_id)
+    for _, oid in ipairs(owner_order) do
+        local o = owners[oid]
+        if o and oid ~= except_id and o.is_active() then
+            return true
+        end
+    end
+    return false
+end
+
+local function sets_equal(a, b)
+    for k in pairs(a) do
+        if not b[k] then
+            return false
+        end
+    end
+    for k in pairs(b) do
+        if not a[k] then
+            return false
+        end
+    end
+    return true
+end
+
+local function has_removed(prev, fresh)
+    for addr in pairs(prev) do
+        if not fresh[addr] then
+            return true
+        end
+    end
+    return false
+end
+
+local function apply_one(inst, applied)
+    if not M.available() or not inst then
+        return false
+    end
+    if not M.is_part(inst) then
+        return false
+    end
+    local addr = M.instance_addr(inst)
+    if not addr then
+        return false
+    end
+    if applied[addr] then
+        return true
+    end
+    local ok, result = pcall(exploits.ApplyChamsToInstance, inst)
+    if ok and result then
+        applied[addr] = true
+        return true
+    end
+    return false
+end
+
+function M.cham_part(inst, applied)
+    return apply_one(inst, applied or {})
+end
+
+function M.find_main_part(model, hints)
+    if not model or not env.is_valid(model) then
+        return nil
+    end
+    hints = hints or {}
+    for i = 1, #hints do
+        local name = hints[i]
+        local p = env.safe_call(function()
+            return model:FindFirstChild(name)
+        end)
+        if p and M.is_part(p) then
+            return p
+        end
+    end
+    local children = env.safe_call(function()
+        return model:GetChildren()
+    end) or {}
+    for _, c in ipairs(children) do
+        if M.is_part(c) then
+            return c
+        end
+    end
+    if M.is_part(model) then
+        return model
+    end
+    return nil
+end
+
+function M.cham_entry_part(entry, applied)
+    if not entry then
+        return false
+    end
+    local part = entry.main_part or entry.anchor
+    if part and env.is_valid(part) and M.is_part(part) then
+        return apply_one(part, applied)
+    end
+    local model = entry.obj or entry.inst or entry.viewmodel
+    if not model or not env.is_valid(model) then
+        return false
+    end
+    local hints = {"Root", "Main", "HumanoidRootPart", "Cam"}
+    if entry.item then
+        if entry.item.priority_part then
+            table.insert(hints, 1, entry.item.priority_part)
+        end
+        if entry.item.anchor_part then
+            table.insert(hints, 1, entry.item.anchor_part)
+        end
+    end
+    local main = M.find_main_part(model, hints)
+    if main then
+        entry.main_part = main
+        return apply_one(main, applied)
+    end
+    return false
+end
+
+function M.register_owner(id, opts)
+    opts = opts or {}
+    if not owners[id] then
+        owner_order[#owner_order + 1] = id
+    end
+    owners[id] = {
+        id = id,
+        applied = {},
+        was_active = false,
+        is_active = opts.is_active or function()
+            return false
+        end,
+        style = opts.style or function()
+            return 0, 0
+        end,
+        collect = opts.collect or function(_back)
+        end,
+        last_rescan = 0,
+        rescan_ms = opts.rescan_ms or 500,
+    }
+    return owners[id]
+end
+
+function M.get_owner(id)
+    return owners[id]
+end
+
+local function apply_owner_into(owner, into)
+    if not owner or not owner.is_active() then
+        return
+    end
+    local mode, color = owner.style()
+    push_style(mode, color)
+    pcall(owner.collect, into)
+end
+
+function M.rebuild_all()
+    if not M.available() or rebuild_busy then
+        return false
+    end
+    local now = now_ms()
+    if last_global_rebuild ~= 0 and (now - last_global_rebuild) < MIN_REBUILD_GAP_MS then
+        return false
+    end
+    last_global_rebuild = now
+    rebuild_busy = true
+
+    pcall(function()
+        exploits.RevertChams()
+    end)
+
+    for _, id in ipairs(owner_order) do
+        local owner = owners[id]
+        if owner then
+            owner.applied = {}
+            owner.last_rescan = 0
+        end
+    end
+
+    for _, id in ipairs(owner_order) do
+        local owner = owners[id]
+        if owner and owner.is_active() then
+            local back = {}
+            apply_owner_into(owner, back)
+            owner.applied = back
+            owner.was_active = true
+        elseif owner then
+            owner.was_active = false
+        end
+    end
+
+    rebuild_busy = false
+    return true
+end
+
+function M.revert_all()
+    if not M.available() then
+        return
+    end
+    pcall(function()
+        exploits.RevertChams()
+    end)
+    last_global_rebuild = now_ms()
+    for _, id in ipairs(owner_order) do
+        local owner = owners[id]
+        if owner then
+            owner.applied = {}
+            owner.was_active = false
+            owner.last_rescan = 0
+        end
+    end
+end
+
+function M.clear_owner(id, rebuild_others)
+    local owner = owners[id]
+    if not owner then
+        return
+    end
+    local had = owner.was_active or next(owner.applied) ~= nil
+    owner.applied = {}
+    owner.was_active = false
+    owner.last_rescan = 0
+    if not had or rebuild_others == false then
+        return
+    end
+    if any_other_active(id) then
+        M.rebuild_all()
+    else
+        M.revert_all()
+    end
+end
+
+function M.refresh_owner_style(id)
+    local owner = owners[id]
+    if not owner then
+        return
+    end
+    if not owner.is_active() then
+        M.clear_owner(id)
+        return
+    end
+    M.rebuild_all()
+end
+
+function M.sync_owner(id, force)
+    if not M.available() or rebuild_busy then
+        return
+    end
+    local owner = owners[id]
+    if not owner then
+        return
+    end
+
+    if not owner.is_active() then
+        if owner.was_active or next(owner.applied) ~= nil then
+            M.clear_owner(id)
+        end
+        return
+    end
+
+    local now = now_ms()
+    if not force and owner.last_rescan ~= 0 and (now - owner.last_rescan) < owner.rescan_ms then
+        owner.was_active = true
+        return
+    end
+    owner.last_rescan = now
+    owner.was_active = true
+
+    local back = {}
+    local mode, color = owner.style()
+    push_style(mode, color)
+    local ok = pcall(owner.collect, back)
+    if not ok then
+        return
+    end
+
+    local front = owner.applied
+
+    if sets_equal(front, back) then
+        return
+    end
+
+    if has_removed(front, back) or next(front) == nil then
+        owner.applied = {}
+        if not M.rebuild_all() then
+            owner.applied = back
+        end
+        return
+    end
+
+    for addr, _ in pairs(back) do
+        if not front[addr] then
+            pcall(exploits.ApplyChamsToInstance, addr)
+            front[addr] = true
+        end
+    end
+    owner.applied = front
+end
+
+function M.wire_style_controls(owner_id, mode_id, color_id)
+    if not menu or not menu.set_visible then
+        return
+    end
+
+    local function sync_color_vis()
+        local mode = M.mode_index(mode_id, 0)
+        pcall(menu.set_visible, color_id, M.color_visible_for_mode(mode))
+    end
+
+    settings.on_change(mode_id, function()
+        sync_color_vis()
+        M.refresh_owner_style(owner_id)
+    end)
+    settings.on_change(color_id, function()
+        M.refresh_owner_style(owner_id)
+    end)
+    sync_color_vis()
 end
 
 return M
@@ -2615,8 +3240,39 @@ local function get_map_camera_folders(ws)
     return folders
 end
 
+local function world_chams_selected(index, s)
+    local opts = s.world_engine_chams
+    if type(opts) ~= "table" then
+        return false
+    end
+    local v = opts[index]
+    return v == true or v == 1
+end
+
+local function item_wanted_for_chams(item, s)
+    if not s.world_enabled or not item then
+        return false
+    end
+    for i, wi in ipairs(world_items.world_items) do
+        if wi.enabled == item.enabled then
+            return world_chams_selected(i, s)
+        end
+    end
+    return false
+end
+
+local function map_cam_wanted_for_chams(s)
+    if not s.world_enabled then
+        return false
+    end
+    return world_chams_selected(#world_items.world_items + 1, s)
+end
+
 local function should_scan_item(item, s, utilities_active, gadget_aim_active)
     if s[item.enabled] then
+        return true
+    end
+    if item_wanted_for_chams(item, s) then
         return true
     end
     if gadget_aim_active and shootable_gadgets.is_shootable_item(item) then
@@ -2681,7 +3337,8 @@ local function make_entry(obj, item, s, cam_x, cam_y, cam_z, max_sq, hide_sq, sq
 
     local dsq = dist3d_sq(px, py, pz, cam_x, cam_y, cam_z)
     local is_dynamic = (item and item.dynamic == true) or for_aim
-    if not in_draw_range(dsq, max_sq, hide_sq, is_dynamic, for_aim) then
+    local for_chams = (item and item_wanted_for_chams(item, s)) or (camera_item and map_cam_wanted_for_chams(s))
+    if not in_draw_range(dsq, max_sq, hide_sq, is_dynamic or for_chams, for_aim or for_chams) then
         return nil
     end
 
@@ -2732,9 +3389,24 @@ local function prune_entries(cache, match_fn, alive_fn, seen)
 end
 
 function M.get_max_sq(s, utilities_active)
-    local max_dist = s.world_max_distance
+    local max_dist = s.world_max_distance or 250
     if utilities_active then
-        max_dist = math.max(max_dist, s.utilities_max_distance)
+        max_dist = math.max(max_dist, s.utilities_max_distance or 75)
+    end
+    if s.world_enabled then
+        local opts = s.world_engine_chams
+        local any_chams = false
+        if type(opts) == "table" then
+            for i = 1, #opts do
+                if opts[i] == true or opts[i] == 1 then
+                    any_chams = true
+                    break
+                end
+            end
+        end
+        if any_chams then
+            max_dist = math.max(max_dist, s.world_engine_chams_range or 250)
+        end
     end
     return max_dist * max_dist
 end
@@ -2785,6 +3457,7 @@ function M.sync_map_cameras(ws, s, utilities_active, cache, cam_x, cam_y, cam_z,
     end
 
     local enabled = s[default_camera.enabled]
+        or map_cam_wanted_for_chams(s)
         or (utilities_active and TARGETABLE_UTILITIES["MAP CAM"])
         or (gadget_aim_active and shootable_gadgets.is_shootable_item(default_camera))
 
@@ -4937,6 +5610,295 @@ return M
 
 end)()
 
+-- ── features/visuals/engine_chams.lua ──
+June._mods["features.visuals.engine_chams"] = (function()
+local settings = June.require("core.settings")
+local cache = June.require("core.cache")
+local env = June.require("core.env")
+local gpu_chams = June.require("core.gpu_chams")
+local world_items = June.require("game.world_items")
+
+local M = {}
+
+local PLAYER_CHAMS = "players_engine_chams"
+local PLAYER_MODE = "players_engine_chams_mode"
+local PLAYER_COLOR = "players_engine_chams_color"
+local PLAYER_RANGE = "players_engine_chams_range"
+local PLAYER_TEAM = "players_engine_chams_team_check"
+local PLAYER_VIS = "players_engine_chams_vischeck"
+
+local WORLD_CHAMS = "world_engine_chams"
+local WORLD_MODE = "world_engine_chams_mode"
+local WORLD_COLOR = "world_engine_chams_color"
+local WORLD_RANGE = "world_engine_chams_range"
+
+local PLAYER_PARTS = {
+    {label = "Head", bones = {"head"}},
+    {label = "Torso", bones = {"torso"}},
+    {label = "Left Arm", bones = {"arm1"}},
+    {label = "Right Arm", bones = {"arm2"}},
+    {label = "Left Leg", bones = {"leg1"}},
+    {label = "Right Leg", bones = {"leg2"}},
+    {label = "Left Shoulder", bones = {"shoulder1"}},
+    {label = "Right Shoulder", bones = {"shoulder2"}},
+    {label = "Left Hip", bones = {"hip1"}},
+    {label = "Right Hip", bones = {"hip2"}},
+}
+
+local WORLD_CHAMS_ITEMS = {}
+do
+    for _, item in ipairs(world_items.world_items) do
+        WORLD_CHAMS_ITEMS[#WORLD_CHAMS_ITEMS + 1] = {
+            label = item.name,
+            enabled = item.enabled,
+            match_label = item.label,
+            item = item,
+        }
+    end
+    for _, item in ipairs(world_items.camera_items) do
+        WORLD_CHAMS_ITEMS[#WORLD_CHAMS_ITEMS + 1] = {
+            label = "Map Cam",
+            enabled = item.enabled,
+            match_label = item.label,
+            item = item,
+            map_cam = true,
+        }
+    end
+end
+
+local _wired = false
+
+local function players_active()
+    if not gpu_chams.available() then
+        return false
+    end
+    if not settings.enabled("players_enabled") then
+        return false
+    end
+    return gpu_chams.multicombo_any(PLAYER_CHAMS, #PLAYER_PARTS)
+end
+
+local function world_active()
+    if not gpu_chams.available() then
+        return false
+    end
+    if not settings.enabled("world_enabled") then
+        return false
+    end
+    return gpu_chams.multicombo_any(WORLD_CHAMS, #WORLD_CHAMS_ITEMS)
+end
+
+local function selected_player_bones()
+    local bones = {}
+    for i, part in ipairs(PLAYER_PARTS) do
+        if gpu_chams.multicombo_selected(PLAYER_CHAMS, i) then
+            for _, b in ipairs(part.bones) do
+                bones[#bones + 1] = b
+            end
+        end
+    end
+    return bones
+end
+
+local function collect_player_chams(applied)
+    local cam_x, cam_y, cam_z = cache.cam_x, cache.cam_y, cache.cam_z
+    if not cam_x then
+        return
+    end
+
+    local range = settings.num(PLAYER_RANGE, 250)
+    local range_sq = range * range
+    local team_check = settings.enabled(PLAYER_TEAM)
+    local vis_check = settings.enabled(PLAYER_VIS)
+    local bones = selected_player_bones()
+    if #bones == 0 then
+        return
+    end
+
+    for _, p in ipairs(cache.players) do
+        if not p or not p.viewmodel or not env.is_valid(p.viewmodel) then
+            goto continue
+        end
+        if not p.health or p.health <= 0 then
+            goto continue
+        end
+        if team_check and p.is_teammate then
+            goto continue
+        end
+        if vis_check and not p.is_visible then
+            goto continue
+        end
+
+        local dist = p.dist
+        if not dist and p.head_pos then
+            local dx = p.head_pos.x - cam_x
+            local dy = p.head_pos.y - cam_y
+            local dz = p.head_pos.z - cam_z
+            dist = math.sqrt(dx * dx + dy * dy + dz * dz)
+        end
+        if dist and (dist * dist) > range_sq then
+            goto continue
+        end
+
+        local vm = p.viewmodel
+        for i = 1, #bones do
+            local part = env.safe_call(function()
+                return vm:FindFirstChild(bones[i])
+            end)
+            if part then
+                gpu_chams.cham_part(part, applied)
+            end
+        end
+        ::continue::
+    end
+end
+
+local function world_index_for_entry(w)
+    if not w then
+        return nil
+    end
+    for i, meta in ipairs(WORLD_CHAMS_ITEMS) do
+        if w.item and meta.item and w.item.enabled == meta.enabled then
+            return i
+        end
+        if meta.map_cam and w.map_only then
+            return i
+        end
+        if meta.match_label and w.label and w.label:find(meta.match_label, 1, true) then
+            return i
+        end
+    end
+    return nil
+end
+
+local function collect_world_chams(applied)
+    local cam_x, cam_y, cam_z = cache.cam_x, cache.cam_y, cache.cam_z
+    if not cam_x then
+        return
+    end
+
+    local range = settings.num(WORLD_RANGE, 250)
+    local range_sq = range * range
+    local team_check = settings.enabled("world_team_check")
+
+    for _, w in ipairs(cache.world) do
+        if not w or not w.obj or not env.is_valid(w.obj) then
+            goto continue
+        end
+        if w.is_broken then
+            goto continue
+        end
+        if team_check and w.is_teammate_gadget then
+            goto continue
+        end
+
+        local idx = world_index_for_entry(w)
+        if not idx or not gpu_chams.multicombo_selected(WORLD_CHAMS, idx) then
+            goto continue
+        end
+
+        local dsq = w.dsq
+        if not dsq and w.x then
+            local dx = w.x - cam_x
+            local dy = w.y - cam_y
+            local dz = w.z - cam_z
+            dsq = dx * dx + dy * dy + dz * dz
+        end
+        if dsq and dsq > range_sq then
+            goto continue
+        end
+
+        gpu_chams.cham_entry_part(w, applied)
+        ::continue::
+    end
+end
+
+local function force_sync(owner_id, active_fn)
+    if active_fn() then
+        gpu_chams.sync_owner(owner_id, true)
+    else
+        gpu_chams.clear_owner(owner_id)
+    end
+end
+
+local function wire_owner_callbacks(owner_id, active_fn, multicombo_id, mode_id, color_id, extra_ids)
+    settings.on_change(multicombo_id, function()
+        force_sync(owner_id, active_fn)
+    end)
+    for _, id in ipairs(extra_ids or {}) do
+        settings.on_change(id, function()
+            force_sync(owner_id, active_fn)
+        end)
+    end
+    gpu_chams.wire_style_controls(owner_id, mode_id, color_id)
+end
+
+function M.register()
+    if _wired then
+        return
+    end
+    _wired = true
+
+    gpu_chams.register_owner("players", {
+        rescan_ms = 350,
+        is_active = players_active,
+        style = function()
+            return gpu_chams.mode_index(PLAYER_MODE, 0), gpu_chams.color_index(PLAYER_COLOR, 0)
+        end,
+        collect = collect_player_chams,
+    })
+
+    gpu_chams.register_owner("world", {
+        rescan_ms = 500,
+        is_active = world_active,
+        style = function()
+            return gpu_chams.mode_index(WORLD_MODE, 0), gpu_chams.color_index(WORLD_COLOR, 0)
+        end,
+        collect = collect_world_chams,
+    })
+
+    wire_owner_callbacks("players", players_active, PLAYER_CHAMS, PLAYER_MODE, PLAYER_COLOR, {
+        "players_enabled",
+        PLAYER_RANGE,
+        PLAYER_TEAM,
+        PLAYER_VIS,
+    })
+    wire_owner_callbacks("world", world_active, WORLD_CHAMS, WORLD_MODE, WORLD_COLOR, {
+        "world_enabled",
+        "world_team_check",
+        WORLD_RANGE,
+    })
+end
+
+function M.update()
+    if not _wired then
+        M.register()
+    end
+    gpu_chams.sync_owner("players")
+    gpu_chams.sync_owner("world")
+end
+
+function M.update_visibility(s)
+    local players_on = s.players_enabled == true
+    local world_on = s.world_enabled == true
+
+    menu.set_visible(PLAYER_CHAMS, players_on)
+    menu.set_visible(PLAYER_MODE, players_on)
+    menu.set_visible(PLAYER_COLOR, players_on and gpu_chams.color_visible_for_mode(gpu_chams.mode_index(PLAYER_MODE, 0)))
+    menu.set_visible(PLAYER_RANGE, players_on)
+    menu.set_visible(PLAYER_TEAM, players_on)
+    menu.set_visible(PLAYER_VIS, players_on)
+
+    menu.set_visible(WORLD_CHAMS, world_on)
+    menu.set_visible(WORLD_MODE, world_on)
+    menu.set_visible(WORLD_COLOR, world_on and gpu_chams.color_visible_for_mode(gpu_chams.mode_index(WORLD_MODE, 0)))
+    menu.set_visible(WORLD_RANGE, world_on)
+end
+
+return M
+
+end)()
+
 -- ── features/visuals/aimbot_visuals.lua ──
 June._mods["features.visuals.aimbot_visuals"] = (function()
 local constants = June.require("core.constants")
@@ -5121,6 +6083,7 @@ local aimbot = June.require("features.combat.aimbot")
 local silent_aim = June.require("features.combat.silent_aim")
 local player_esp = June.require("features.visuals.player_esp")
 local world_esp = June.require("features.visuals.world_esp")
+local engine_chams = June.require("features.visuals.engine_chams")
 local aimbot_visuals = June.require("features.visuals.aimbot_visuals")
 local crosshair = June.require("features.visuals.crosshair")
 local keybind_window = June.require("features.utility.keybind_window")
@@ -5132,6 +6095,7 @@ function M.register_all()
     if M._menu_registered then return end
     menu_defs.register_all()
     config.register_menu()
+    engine_chams.register()
     M._menu_registered = true
 end
 
@@ -5175,6 +6139,7 @@ function M.update(_dt)
     menu.set_visible("silent_fov_fill", s.silent_aim_enabled and s.silent_draw_fov)
     menu.set_visible("silent_gadget_aim", s.silent_aim_enabled)
     menu.set_visible("silent_gadget_team_check", s.silent_aim_enabled and s.silent_gadget_aim)
+    engine_chams.update_visibility(s)
     scan.update_char_models()
     scan.scan_players()
     scan.scan_world()
@@ -5182,6 +6147,7 @@ function M.update(_dt)
     aimbot.process_toggle("world_enabled", cache.toggles.world, "world_enabled")
     silent_aim.update(_dt)
     aimbot.process_aimbot()
+    engine_chams.update()
 end
 
 function M.draw()

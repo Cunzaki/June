@@ -114,8 +114,39 @@ local function get_map_camera_folders(ws)
     return folders
 end
 
+local function world_chams_selected(index, s)
+    local opts = s.world_engine_chams
+    if type(opts) ~= "table" then
+        return false
+    end
+    local v = opts[index]
+    return v == true or v == 1
+end
+
+local function item_wanted_for_chams(item, s)
+    if not s.world_enabled or not item then
+        return false
+    end
+    for i, wi in ipairs(world_items.world_items) do
+        if wi.enabled == item.enabled then
+            return world_chams_selected(i, s)
+        end
+    end
+    return false
+end
+
+local function map_cam_wanted_for_chams(s)
+    if not s.world_enabled then
+        return false
+    end
+    return world_chams_selected(#world_items.world_items + 1, s)
+end
+
 local function should_scan_item(item, s, utilities_active, gadget_aim_active)
     if s[item.enabled] then
+        return true
+    end
+    if item_wanted_for_chams(item, s) then
         return true
     end
     if gadget_aim_active and shootable_gadgets.is_shootable_item(item) then
@@ -180,7 +211,8 @@ local function make_entry(obj, item, s, cam_x, cam_y, cam_z, max_sq, hide_sq, sq
 
     local dsq = dist3d_sq(px, py, pz, cam_x, cam_y, cam_z)
     local is_dynamic = (item and item.dynamic == true) or for_aim
-    if not in_draw_range(dsq, max_sq, hide_sq, is_dynamic, for_aim) then
+    local for_chams = (item and item_wanted_for_chams(item, s)) or (camera_item and map_cam_wanted_for_chams(s))
+    if not in_draw_range(dsq, max_sq, hide_sq, is_dynamic or for_chams, for_aim or for_chams) then
         return nil
     end
 
@@ -231,9 +263,24 @@ local function prune_entries(cache, match_fn, alive_fn, seen)
 end
 
 function M.get_max_sq(s, utilities_active)
-    local max_dist = s.world_max_distance
+    local max_dist = s.world_max_distance or 250
     if utilities_active then
-        max_dist = math.max(max_dist, s.utilities_max_distance)
+        max_dist = math.max(max_dist, s.utilities_max_distance or 75)
+    end
+    if s.world_enabled then
+        local opts = s.world_engine_chams
+        local any_chams = false
+        if type(opts) == "table" then
+            for i = 1, #opts do
+                if opts[i] == true or opts[i] == 1 then
+                    any_chams = true
+                    break
+                end
+            end
+        end
+        if any_chams then
+            max_dist = math.max(max_dist, s.world_engine_chams_range or 250)
+        end
     end
     return max_dist * max_dist
 end
@@ -284,6 +331,7 @@ function M.sync_map_cameras(ws, s, utilities_active, cache, cam_x, cam_y, cam_z,
     end
 
     local enabled = s[default_camera.enabled]
+        or map_cam_wanted_for_chams(s)
         or (utilities_active and TARGETABLE_UTILITIES["MAP CAM"])
         or (gadget_aim_active and shootable_gadgets.is_shootable_item(default_camera))
 
