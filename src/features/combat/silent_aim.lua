@@ -1,28 +1,25 @@
 local constants = June.require("core.constants")
 local settings = June.require("core.settings")
 local cache = June.require("core.cache")
+local health = June.require("core.health")
 local silent_ray = June.require("core.silent_ray")
 local silent_resolve = June.require("features.combat.silent_resolve")
+local hitscan_visuals = June.require("features.visuals.hitscan_visuals")
 local shootable_gadgets = June.require("game.shootable_gadgets")
+local combat_origin = June.require("game.combat_origin")
+local combat_vis = June.require("core.combat_vis")
 
 local sqrt = constants.sqrt
 local AIM_TARGET = constants.AIM_TARGET
 local SHOOT_VK = 0x01
-local TARGET_SCAN_MS = 33
+local WEAPON_CHECK_MS = 80
 
 local M = {}
 local s = settings.s
 local locked_target = nil
-local last_target_scan = 0
-local weapon_hold_ticks = 0
+local last_weapon_check = 0
+local weapon_holding = false
 local bone_map = {[0] = "head", [1] = "torso", [2] = "arm1", [3] = "arm2", [4] = "leg1", [5] = "leg2"}
-
-local function silent_vis_enabled()
-    if menu and menu.get then
-        return menu.get("silent_filter_visible") == true
-    end
-    return s.silent_filter_visible == true
-end
 
 local function tick_ms()
     return utility and utility.get_tick_count and utility.get_tick_count() or 0
@@ -56,27 +53,17 @@ local function live_world_entry(entry)
 end
 
 local function holding_weapon()
-    if not cache.ws then
-        weapon_hold_ticks = math.max(0, weapon_hold_ticks - 1)
-        return weapon_hold_ticks > 0
+    local now = tick_ms()
+    if now - last_weapon_check < WEAPON_CHECK_MS then
+        return weapon_holding
     end
-    local vms = cache.ws:FindFirstChild("Viewmodels")
-    local local_vm = vms and vms:FindFirstChild("LocalViewmodel")
-    local has_weapon = false
-    if local_vm then
-        for _, child in ipairs(local_vm:GetChildren()) do
-            if child.ClassName == "Model" and not cache.body_part_names[child.Name] and child:FindFirstChild("Magazine") then
-                has_weapon = true
-                break
-            end
-        end
+    last_weapon_check = now
+
+    weapon_holding = combat_origin.has_weapon() == true
+    if not weapon_holding and input and input.is_key_down and input.is_key_down(SHOOT_VK) then
+        weapon_holding = true
     end
-    if has_weapon then
-        weapon_hold_ticks = 4
-    else
-        weapon_hold_ticks = math.max(0, weapon_hold_ticks - 1)
-    end
-    return weapon_hold_ticks > 0
+    return weapon_holding
 end
 
 local function live_bone_pos(p, bone_name)
@@ -103,7 +90,7 @@ local function apply_prediction(pos, p)
     }
 end
 
-local function get_bone_pos(p)
+function M.get_bone_pos(p)
     if not p then
         return nil
     end
@@ -133,6 +120,28 @@ local function get_bone_pos(p)
     return apply_prediction(pos, p)
 end
 
+local function vis_filter_enabled()
+    if menu and menu.get then
+        return menu.get("silent_filter_visible") == true
+    end
+    return s.silent_filter_visible == true
+end
+
+local function player_visible(p, aim)
+    if not vis_filter_enabled() then
+        return true
+    end
+    if not p or not aim then
+        return false
+    end
+    local cam = silent_ray.get_camera_origin()
+    if not cam then
+        return false
+    end
+    local muzzle = combat_origin.get_muzzle_origin()
+    return combat_vis.can_see_player(cam.x, cam.y, cam.z, p, aim, true, muzzle)
+end
+
 local function passes_gadget_filters(w)
     if not w or not w.x then
         return false
@@ -146,7 +155,7 @@ local function passes_gadget_filters(w)
     if s.silent_gadget_team_check and w.is_teammate_gadget then
         return false
     end
-    if silent_vis_enabled() and w.is_visible ~= true then
+    if vis_filter_enabled() and w.is_visible ~= true then
         return false
     end
     return true
@@ -167,16 +176,17 @@ local function passes_filters(p)
     if s.silent_filter_team and p.is_teammate then
         return false
     end
-    if s.silent_filter_health and p.health <= 0 then
-        return false
-    end
-    if s.silent_filter_visible and not p.is_visible then
+    if s.silent_filter_health and not health.passes(s, p) then
         return false
     end
     if p.dist > (s.silent_max_dist or 250) then
         return false
     end
-    return true
+    local aim = M.get_bone_pos(p)
+    if not aim then
+        return false
+    end
+    return player_visible(p, aim)
 end
 
 local function is_valid_player_target(p)
@@ -185,7 +195,7 @@ local function is_valid_player_target(p)
     end
     for _, cp in ipairs(cache.players) do
         if cp.viewmodel == p.viewmodel then
-            return cp.health > 0
+            return health.passes(s, cp)
         end
     end
     return false
@@ -210,7 +220,7 @@ local function is_valid_target(t)
 end
 
 local function in_fov_player(p, cx, cy, fov)
-    local tb = get_bone_pos(p)
+    local tb = M.get_bone_pos(p)
     if not tb then
         return false
     end
@@ -222,7 +232,7 @@ local function in_fov_player(p, cx, cy, fov)
 end
 
 local function score_player(p, cx, cy, fov)
-    local tb = get_bone_pos(p)
+    local tb = M.get_bone_pos(p)
     if not tb then
         return nil
     end
@@ -289,27 +299,19 @@ local function refresh_target(cx, cy, fov)
         locked_target = nil
     end
 
-    local now = tick_ms()
-    if now - last_target_scan < TARGET_SCAN_MS then
-        return
-    end
-    last_target_scan = now
-
     local new = find_target(cx, cy, fov)
     if new then
         locked_target = new
         return
     end
 
-    if not s.silent_sticky and locked_target then
-        if is_gadget_target(locked_target) then
-            local w = live_world_entry(locked_target.world_entry)
-            if not w or not score_gadget(w, cx, cy, fov) then
-                locked_target = nil
-            end
-        elseif not in_fov_player(locked_target, cx, cy, fov) then
+    if is_gadget_target(locked_target) then
+        local w = live_world_entry(locked_target.world_entry)
+        if not w or not score_gadget(w, cx, cy, fov) then
             locked_target = nil
         end
+    elseif locked_target and not in_fov_player(locked_target, cx, cy, fov) then
+        locked_target = nil
     end
 end
 
@@ -328,23 +330,23 @@ function M.get_aim_point()
     if is_gadget_target(locked_target) then
         return get_gadget_aim(locked_target.world_entry)
     end
-    return get_bone_pos(locked_target)
+    return M.get_bone_pos(locked_target)
 end
 
 function M.update(_dt)
     if not M.active() then
         locked_target = nil
+        cache.aim.silent_target_vm = nil
         silent_ray.stop()
         return
     end
 
     silent_ray.ensure_hook()
+    combat_origin.invalidate()
 
     if not holding_weapon() then
-        if not (input and input.is_key_down and input.is_key_down(0x01)) then
-            silent_ray.stop()
-            return
-        end
+        cache.aim.silent_target_vm = nil
+        return
     end
 
     local cx, cy = cache.screen_w * 0.5, cache.screen_h * 0.5
@@ -353,23 +355,27 @@ function M.update(_dt)
     refresh_target(cx, cy, fov)
 
     if not locked_target then
-        silent_ray.stop()
+        cache.aim.silent_target_vm = nil
         return
+    end
+
+    if is_gadget_target(locked_target) then
+        cache.aim.silent_target_vm = nil
+    else
+        cache.aim.silent_target_vm = locked_target.viewmodel
     end
 
     local aim = M.get_aim_point()
     if not aim then
-        silent_ray.stop()
         return
     end
 
-    local origin, resolved_aim = silent_resolve.resolve_track(aim)
+    local origin, resolved_aim, hitpart = silent_resolve.resolve_track(aim, s.silent_bone)
     if not origin or not resolved_aim then
-        silent_ray.stop()
         return
     end
 
-    silent_ray.track(origin, resolved_aim, SHOOT_VK)
+    silent_ray.track(origin, resolved_aim, SHOOT_VK, hitpart or aim, true)
 end
 
 function M.draw()
@@ -401,6 +407,10 @@ function M.draw()
                 draw.line(cx, cy, tx, ty, col, 1.5)
             end
         end
+    end
+
+    if s.silent_hitscan_vis then
+        hitscan_visuals.draw(silent_resolve.last_info)
     end
 end
 

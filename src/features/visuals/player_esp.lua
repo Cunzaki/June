@@ -49,12 +49,13 @@ local function render_players()
     local tracer_origin = s.tracer_origin or TRACER_ORIGIN.BOTTOM
     local tracer_style = s.tracer_style or TRACER_STYLE.SOLID
     local vis_override = s.players_visible_override
-    local vis_col = s.players_visible_override_color
+    local vis_col = s.players_visible_override_color or {0, 1, 0.3, 1}
     local tgt_override = s.players_target_override
-    local tgt_col = s.players_target_override_color
+    local tgt_col = s.players_target_override_color or {1, 0.2, 0.2, 1}
     local aim_target_vm = cache.aim.current_target and cache.aim.current_target.target and
         (not cache.aim.current_target.target.is_utility) and
         cache.aim.current_target.target.viewmodel or nil
+    local silent_target_vm = cache.aim.silent_target_vm
 
     for _, p in ipairs(cache.players) do
         if not p.is_teammate or s.players_team then
@@ -68,7 +69,11 @@ local function render_players()
             end
 
             local eff_col = esp_col
-            if tgt_override and aim_target_vm and p.viewmodel == aim_target_vm then
+            local is_target = tgt_override and p.viewmodel and (
+                (aim_target_vm and p.viewmodel == aim_target_vm)
+                or (silent_target_vm and p.viewmodel == silent_target_vm)
+            )
+            if is_target then
                 eff_col = tgt_col
             elseif vis_override and p.is_visible then
                 eff_col = vis_col
@@ -93,7 +98,7 @@ local function render_players()
             local c_view = eff_col
             local c_trac = eff_col
 
-            if not (tgt_override or (vis_override and p.is_visible)) then
+            if not is_target and not (vis_override and p.is_visible) then
                 c_name = name_col
                 c_wpn = wpn_col
                 c_dist = dist_col

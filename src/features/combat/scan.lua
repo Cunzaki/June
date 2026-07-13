@@ -1,10 +1,12 @@
 local constants = June.require("core.constants")
 local settings = June.require("core.settings")
 local cache = June.require("core.cache")
+local health = June.require("core.health")
 local world_scan = June.require("game.world_scan")
 local draw_util = June.require("core.draw_util")
 local shootable_gadgets = June.require("game.shootable_gadgets")
 local vis_util = June.require("core.vis_util")
+local combat_vis = June.require("core.combat_vis")
 
 local sqrt, min, max = constants.sqrt, constants.min, constants.max
 local DIST = constants.DIST
@@ -170,12 +172,10 @@ local function discover_player_from_vm(vm, cam_x, cam_y, cam_z, player_lookup)
         return nil
     end
 
-    local char_data = cache.char_models[char_obj]
-    local hp, mhp = 100, 125
-    if char_data and char_data.hum then
-        hp, mhp = char_data.hum.Health, char_data.hum.MaxHealth
-    end
-    if hp <= 0 then
+    local char_data = char_obj and cache.char_models[char_obj] or nil
+    local p_obj = player_lookup[cn]
+    local hp, mhp, alive = health.resolve(cn, p_obj, char_data, vm)
+    if not alive or hp <= 0 then
         return nil
     end
 
@@ -197,7 +197,6 @@ local function discover_player_from_vm(vm, cam_x, cam_y, cam_z, player_lookup)
         lv = {x = h.LookVector.X, y = h.LookVector.Y, z = h.LookVector.Z}
     end
 
-    local p_obj = player_lookup[cn]
     local php = (p_obj and p_obj.head_position) and
         {x = p_obj.head_position.x, y = p_obj.head_position.y, z = p_obj.head_position.z} or
         {x = hx, y = hy, z = hz}
@@ -213,6 +212,7 @@ local function discover_player_from_vm(vm, cam_x, cam_y, cam_z, player_lookup)
         weapon = wpn,
         health = hp,
         max_health = mhp,
+        is_alive = alive,
         is_teammate = is_teammate(vm),
         viewmodel = vm,
         char_obj = char_obj,
@@ -252,13 +252,8 @@ local function refresh_player_live(p, cam_x, cam_y, cam_z, player_lookup)
     p.bbox = bbox
     p.dist = sqrt(dsq)
 
-    if p.char_obj and cache.char_models[p.char_obj] and cache.char_models[p.char_obj].hum then
-        local hum = cache.char_models[p.char_obj].hum
-        p.health = hum.Health
-        p.max_health = hum.MaxHealth
-        if p.health <= 0 then
-            return false
-        end
+    if not health.apply(p, player_lookup[p.name], p.char_obj and cache.char_models[p.char_obj] or nil) then
+        return false
     end
 
     if h.LookVector then
@@ -316,6 +311,34 @@ local function update_visibility(cam_x, cam_y, cam_z)
         return
     end
 
+    local per_player = (s.players_visible_override and s.players_enabled)
+        or (s.silent_filter_visible and s.silent_aim_enabled)
+
+    local function should_check(p)
+        local valid_esp = s.players_enabled and (s.players_team or not p.is_teammate)
+        local valid_aim = s.aimbot_enabled and (not s.aimbot_team_check or not p.is_teammate)
+        local valid_silent = s.silent_aim_enabled and (not s.silent_filter_team or not p.is_teammate)
+        return (s.aimbot_vischeck and valid_aim)
+            or (s.silent_filter_visible and valid_silent)
+            or (s.players_visible_override and valid_esp)
+    end
+
+    local function check_player(p)
+        local penetrate = s.silent_filter_visible and s.silent_aim_enabled
+        return combat_vis.can_see_player(cam_x, cam_y, cam_z, p, p.head_pos, penetrate, nil)
+    end
+
+    if per_player then
+        for i = 1, #cache.players do
+            local p = cache.players[i]
+            p.is_visible = false
+            if should_check(p) then
+                p.is_visible = check_player(p)
+            end
+        end
+        return
+    end
+
     local min_val = math.huge
     local closest_p = nil
     local cx, cy = cache.screen_w * 0.5, cache.screen_h * 0.5
@@ -323,14 +346,7 @@ local function update_visibility(cam_x, cam_y, cam_z)
     for i = 1, #cache.players do
         local p = cache.players[i]
         p.is_visible = false
-        local valid_for_esp = s.players_enabled and (s.players_team or not p.is_teammate)
-        local valid_for_aim = s.aimbot_enabled and (not s.aimbot_team_check or not p.is_teammate)
-        local valid_for_silent = s.silent_aim_enabled and (not s.silent_filter_team or not p.is_teammate)
-        local need_vis = (s.aimbot_vischeck and valid_for_aim)
-            or (s.silent_filter_visible and valid_for_silent)
-            or (s.players_visible_override and valid_for_esp)
-
-        if need_vis and (valid_for_esp or valid_for_aim or valid_for_silent) then
+        if should_check(p) then
             if s.vis_check_priority == 1 and p.screen_vis then
                 local dist2d = sqrt((p.screen_cx - cx) ^ 2 + (p.screen_mny - cy) ^ 2)
                 if dist2d < min_val then
@@ -344,11 +360,8 @@ local function update_visibility(cam_x, cam_y, cam_z)
         end
     end
 
-    if closest_p and raycast and raycast.is_visible then
-        closest_p.is_visible = raycast.is_visible(
-            cam_x, cam_y, cam_z,
-            closest_p.head_pos.x, closest_p.head_pos.y, closest_p.head_pos.z
-        )
+    if closest_p then
+        closest_p.is_visible = check_player(closest_p)
     end
 end
 
@@ -401,6 +414,12 @@ function M.scan_players()
     end
 
     update_visibility(cam_x, cam_y, cam_z)
+
+    local active_names = {}
+    for i = 1, #cache.players do
+        active_names[cache.players[i].name] = true
+    end
+    health.prune_cache(active_names)
 
     if s.aimbot_target_type == AIM_TARGET.DISTANCE then
         table.sort(cache.players, function(a, b)

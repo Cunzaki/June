@@ -11,7 +11,7 @@ local M = {
     screen_h = 0,
     ws = nil,
     last_cleanup = 0,
-    aim = {current_target = nil, locked_target = nil, last_key_state = false, last_main_key_state = false, last_lmb_state = false},
+    aim = {current_target = nil, locked_target = nil, silent_target_vm = nil, last_key_state = false, last_main_key_state = false, last_lmb_state = false},
     toggles = {player = {last = false}, world = {last = false}},
     bone_list = {"head", "torso", "arm1", "arm2", "leg1", "leg2", "shoulder1", "shoulder2", "hip1", "hip2"},
     cham_bone_list = {"head", "torso", "arm1", "arm2", "leg1", "leg2"},

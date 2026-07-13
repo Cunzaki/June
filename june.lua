@@ -1,6 +1,6 @@
 --[[
     June — Project Vector script
-    Built: 2026-07-10T13:41:02.955Z
+    Built: 2026-07-13T13:26:09.352Z
 ]]
 
 June = {
@@ -211,7 +211,7 @@ local M = {
     screen_h = 0,
     ws = nil,
     last_cleanup = 0,
-    aim = {current_target = nil, locked_target = nil, last_key_state = false, last_main_key_state = false, last_lmb_state = false},
+    aim = {current_target = nil, locked_target = nil, silent_target_vm = nil, last_key_state = false, last_main_key_state = false, last_lmb_state = false},
     toggles = {player = {last = false}, world = {last = false}},
     bone_list = {"head", "torso", "arm1", "arm2", "leg1", "leg2", "shoulder1", "shoulder2", "hip1", "hip2"},
     cham_bone_list = {"head", "torso", "arm1", "arm2", "leg1", "leg2"},
@@ -277,6 +277,8 @@ M.TAB = "June"
 
 M.G = {
     COMBAT = "Combat",
+    GUN_MODS = "Gun Mods",
+    MOVEMENT = "Movement",
     PLAYERS = "Players",
     WORLD = "World",
     SETTINGS = "Settings",
@@ -303,7 +305,8 @@ function M.ensure_groups()
     M.ensure_tab()
 
     local rows = {
-        { M.G.COMBAT, M.G.PLAYERS },
+        { M.G.COMBAT, M.G.GUN_MODS },
+        { M.G.MOVEMENT, M.G.PLAYERS },
         { M.G.WORLD, M.G.SETTINGS },
     }
 
@@ -792,12 +795,31 @@ function M.find_anchor(obj, item)
     end
 
     local seen = {}
+    local function consider(part)
+        if part and not seen[part] and part_visible(part) then
+            seen[part] = true
+            return part
+        end
+        return nil
+    end
+
     for _, name in ipairs(names) do
         if not seen[name] then
             seen[name] = true
             local part = obj:FindFirstChild(name)
-            if part_visible(part) then
+            part = consider(part)
+            if part then
                 return part
+            end
+            if obj.GetDescendants then
+                for _, desc in ipairs(obj:GetDescendants()) do
+                    if desc.Name == name then
+                        part = consider(desc)
+                        if part then
+                            return part
+                        end
+                    end
+                end
             end
         end
     end
@@ -1050,7 +1072,6 @@ M.menu_items = {
         v = 0,
         p = "aimbot_enabled"
     },
-    {g = "Combat", t = "checkbox", id = "aimbot_sticky", n = "Sticky Aim", v = false, p = "aimbot_enabled"},
     {g = "Combat", t = "checkbox", id = "aimbot_flick", n = "Flick Mode", v = false, p = "aimbot_enabled"},
     {g = "Combat", t = "checkbox", id = "aimbot_vischeck", n = "Visibility Check", v = false, p = "aimbot_enabled"},
     {
@@ -1121,11 +1142,16 @@ M.menu_items = {
         v = 0,
         p = "silent_aim_enabled"
     },
-    {g = "Combat", t = "checkbox", id = "silent_filter_health", n = "Silent Health Check", v = false, p = "silent_aim_enabled"},
+    {g = "Combat", t = "checkbox", id = "aimbot_health_check", n = "Aimbot Health Check", v = true, p = "aimbot_enabled"},
+    {g = "Combat", t = "checkbox", id = "silent_filter_health", n = "Silent Health Check", v = true, p = "silent_aim_enabled"},
     {g = "Combat", t = "checkbox", id = "silent_filter_visible", n = "Silent Visible Only", v = false, p = "silent_aim_enabled"},
     {g = "Combat", t = "checkbox", id = "silent_gadget_aim", n = "Silent Gadget Aim", v = false, p = "silent_aim_enabled"},
     {g = "Combat", t = "checkbox", id = "silent_gadget_team_check", n = "Silent Gadget Team Check", v = false, p = "silent_gadget_aim"},
     {g = "Combat", t = "checkbox", id = "silent_filter_team", n = "Silent Team Check", v = false, p = "silent_aim_enabled"},
+    {g = "Combat", t = "separator"},
+    {g = "Combat", t = "label", n = "Silent Exploits"},
+    {g = "Combat", t = "checkbox", id = "silent_hitscan", n = "Hitscan", v = false, p = "silent_aim_enabled"},
+    {g = "Combat", t = "checkbox", id = "silent_hitscan_vis", n = "Hitscan Ray Visual", v = false, p = "silent_hitscan"},
     {
         g = "Combat",
         t = "slider_int",
@@ -1146,7 +1172,6 @@ M.menu_items = {
         v = 150,
         p = "silent_aim_enabled"
     },
-    {g = "Combat", t = "checkbox", id = "silent_sticky", n = "Silent Sticky Target", v = false, p = "silent_aim_enabled"},
     {g = "Combat", t = "checkbox", id = "silent_prediction", n = "Silent Prediction", v = false, p = "silent_aim_enabled"},
     {
         g = "Combat",
@@ -1194,6 +1219,34 @@ M.menu_items = {
         p = "silent_aim_enabled",
         c = {1, 0.25, 0.25, 1}
     },
+    {g = "Gun Mods", t = "checkbox", id = "june_gunmods_enabled", n = "Enable Gun Mods", v = false},
+    {g = "Gun Mods", t = "input", id = "june_gm_status", n = "GC Status", v = "Off", p = "june_gunmods_enabled"},
+    {g = "Gun Mods", t = "label", n = "Weapon Stats (equipped gun)"},
+    {g = "Gun Mods", t = "checkbox", id = "june_gm_recoil", n = "Low Recoil", v = false, p = "june_gunmods_enabled"},
+    {g = "Gun Mods", t = "checkbox", id = "june_gm_firerate", n = "Fire Rate", v = false, p = "june_gunmods_enabled"},
+    {g = "Gun Mods", t = "slider_int", id = "june_gm_firerate_val", n = "Firerate (RPM)", min = 60, max = 400, v = 300, p = "june_gm_firerate"},
+    {g = "Gun Mods", t = "checkbox", id = "june_gm_damage", n = "Damage", v = false, p = "june_gunmods_enabled"},
+    {g = "Gun Mods", t = "slider_int", id = "june_gm_damage_val", n = "Damage", min = 1, max = 120, v = 100, p = "june_gm_damage"},
+    {g = "Gun Mods", t = "checkbox", id = "june_gm_range", n = "Range", v = false, p = "june_gunmods_enabled"},
+    {g = "Gun Mods", t = "slider_int", id = "june_gm_range_val", n = "Range", min = 1, max = 100, v = 80, p = "june_gm_range"},
+    {g = "Gun Mods", t = "checkbox", id = "june_gm_destructive", n = "Destructive (wallbang)", v = false, p = "june_gunmods_enabled"},
+    {g = "Gun Mods", t = "slider_int", id = "june_gm_destructive_val", n = "Destructive", min = 1, max = 30, v = 20, p = "june_gm_destructive"},
+    {g = "Gun Mods", t = "checkbox", id = "june_gm_lightweight", n = "Lightweight (move speed)", v = false, p = "june_gunmods_enabled"},
+    {g = "Gun Mods", t = "slider_int", id = "june_gm_lightweight_val", n = "Weight %", min = 85, max = 100, v = 100, p = "june_gm_lightweight"},
+    {g = "Gun Mods", t = "separator"},
+    {g = "Gun Mods", t = "label", n = "GC Exploits (character / match)"},
+    {g = "Gun Mods", t = "checkbox", id = "june_gc_speed_mult", n = "Speed Multiplier", v = false, p = "june_gunmods_enabled"},
+    {g = "Gun Mods", t = "slider_int", id = "june_gc_speed_mult_val", n = "Speed Mult %", min = 100, max = 140, v = 115, p = "june_gc_speed_mult"},
+    {g = "Gun Mods", t = "checkbox", id = "june_gc_infinite_ammo", n = "Infinite Ammo (fuel)", v = false, p = "june_gunmods_enabled"},
+    {g = "Movement", t = "checkbox", id = "june_move_desync", n = "Movement Desync", v = true},
+    {g = "Movement", t = "label", n = "Autosend pulse 0.1s — physics choke then brief resync"},
+    {g = "Movement", t = "checkbox", id = "june_fly_enabled", n = "Fly", v = false, k = 0x46},
+    {g = "Movement", t = "slider_int", id = "june_fly_speed", n = "Fly Speed", min = 2, max = 4, v = 3, p = "june_fly_enabled"},
+    {g = "Movement", t = "checkbox", id = "june_fly_noclip", n = "Fly Noclip", v = false, p = "june_fly_enabled"},
+    {g = "Movement", t = "checkbox", id = "june_slowfall_enabled", n = "Slowfall", v = false},
+    {g = "Movement", t = "slider_int", id = "june_slowfall_speed", n = "Fall Speed", min = 1, max = 50, v = 5, p = "june_slowfall_enabled"},
+    {g = "Movement", t = "checkbox", id = "june_speed_boost_enabled", n = "Speed Boost", v = false},
+    {g = "Movement", t = "slider_int", id = "june_speed_boost_mult", n = "Speed Boost %", min = 0, max = 30, v = 12, p = "june_speed_boost_enabled"},
     {g = "Players", t = "checkbox", id = "players_enabled", n = "Enable Player Visuals", v = false, k = 0x73, c = {1, 1, 1, 1}},
     {g = "Players", t = "checkbox", id = "players_box", n = "Player Box", v = true, p = "players_enabled"},
     {
@@ -1344,72 +1397,6 @@ M.menu_items = {
         c = {1, 0.2, 0.2, 1}
     },
     {g = "Players", t = "checkbox", id = "players_team", n = "Show Teammates", v = false, p = "players_enabled"},
-    {g = "Players", t = "separator"},
-    {g = "Players", t = "label", n = "Engine Chams"},
-    {
-        g = "Players",
-        t = "multicombo",
-        id = "players_engine_chams",
-        n = "Player Engine Chams",
-        o = {
-            "Head",
-            "Torso",
-            "Left Arm",
-            "Right Arm",
-            "Left Leg",
-            "Right Leg",
-            "Left Shoulder",
-            "Right Shoulder",
-            "Left Hip",
-            "Right Hip",
-        },
-        v = {false, false, false, false, false, false, false, false, false, false},
-        p = "players_enabled"
-    },
-    {
-        g = "Players",
-        t = "combo",
-        id = "players_engine_chams_mode",
-        n = "Player Chams Mode",
-        o = {"Fill", "Wireframe", "Fill Glow", "Wireframe Glow"},
-        v = 0,
-        p = "players_enabled"
-    },
-    {
-        g = "Players",
-        t = "combo",
-        id = "players_engine_chams_color",
-        n = "Player Chams Color",
-        o = {"Default", "Red", "Green", "Yellow", "Blue", "Magenta", "Cyan"},
-        v = 0,
-        p = "players_enabled"
-    },
-    {
-        g = "Players",
-        t = "slider_int",
-        id = "players_engine_chams_range",
-        n = "Player Chams Range",
-        min = 1,
-        max = 500,
-        v = 250,
-        p = "players_enabled"
-    },
-    {
-        g = "Players",
-        t = "checkbox",
-        id = "players_engine_chams_team_check",
-        n = "Chams Team Check",
-        v = true,
-        p = "players_enabled"
-    },
-    {
-        g = "Players",
-        t = "checkbox",
-        id = "players_engine_chams_vischeck",
-        n = "Chams Visibility Check",
-        v = false,
-        p = "players_enabled"
-    },
     {g = "World", t = "checkbox", id = "world_enabled", n = "Enable World Visuals", v = false, k = 0x74},
     {g = "World", t = "checkbox", id = "world_team_check", n = "Gadget Team Check", v = false, p = "world_enabled"},
     {
@@ -1422,75 +1409,6 @@ M.menu_items = {
         p = "world_enabled"
     },
     {g = "World", t = "separator"},
-    {g = "World", t = "label", n = "Engine Chams"},
-    {
-        g = "World",
-        t = "multicombo",
-        id = "world_engine_chams",
-        n = "World Engine Chams",
-        o = {
-            "Bomb",
-            "Defuser",
-            "Claymore",
-            "Drone",
-            "StunGrenade",
-            "SmokeGrenade",
-            "EMPGrenade",
-            "ImpactGrenade",
-            "BreachCharge",
-            "RemoteC4",
-            "FragGrenade",
-            "StickyCamera",
-            "SignalDisruptor",
-            "HardBreachCharge",
-            "ProximityAlarm",
-            "BarbedWire",
-            "IncendiaryGrenade",
-            "IncendiaryCanister",
-            "BulletproofCamera",
-            "DeployableShield",
-            "ThermiteCharge",
-            "ShockBattery",
-            "NeedleMine",
-            "ToxicCharge",
-            "MetalBarricade",
-            "Map Cam",
-        },
-        v = {
-            false, false, false, false, false, false, false, false, false, false,
-            false, false, false, false, false, false, false, false, false, false,
-            false, false, false, false, false, false,
-        },
-        p = "world_enabled"
-    },
-    {
-        g = "World",
-        t = "combo",
-        id = "world_engine_chams_mode",
-        n = "World Chams Mode",
-        o = {"Fill", "Wireframe", "Fill Glow", "Wireframe Glow"},
-        v = 0,
-        p = "world_enabled"
-    },
-    {
-        g = "World",
-        t = "combo",
-        id = "world_engine_chams_color",
-        n = "World Chams Color",
-        o = {"Default", "Red", "Green", "Yellow", "Blue", "Magenta", "Cyan"},
-        v = 0,
-        p = "world_enabled"
-    },
-    {
-        g = "World",
-        t = "slider_int",
-        id = "world_engine_chams_range",
-        n = "World Chams Range",
-        min = 1,
-        max = 500,
-        v = 250,
-        p = "world_enabled"
-    },
     {
         g = "World",
         t = "multicombo",
@@ -1665,6 +1583,20 @@ M.menu_items = {
         p = "world_enabled"
     },
     {g = "Settings", t = "separator"},
+    {g = "Settings", t = "label", n = "Combat"},
+    {g = "Settings", t = "checkbox", id = "health_check", n = "Health Check", v = true},
+    {g = "Settings", t = "checkbox", id = "fov_changer_enabled", n = "FOV Changer", v = false},
+    {
+        g = "Settings",
+        t = "slider_int",
+        id = "fov_changer_value",
+        n = "Custom FOV",
+        min = 60,
+        max = 90,
+        v = 90,
+        p = "fov_changer_enabled"
+    },
+    {g = "Settings", t = "separator"},
     {g = "Settings", t = "label", n = "Overlay"},
     {g = "Settings", t = "slider_int", id = "font_size_name", n = "Name Font Size", min = 8, max = 24, v = 14},
     {g = "Settings", t = "slider_int", id = "font_size_weapon", n = "Weapon Font Size", min = 8, max = 24, v = 12},
@@ -1750,6 +1682,8 @@ function M.register_all()
             menu.add_separator(M.TAB, m.g)
         elseif m.t == "label" then
             menu.add_label(M.TAB, m.g, m.n)
+        elseif m.t == "input" then
+            menu.add_input(M.TAB, m.g, m.id, m.n, m.v, opts)
         end
     end
 end
@@ -1861,522 +1795,379 @@ return M
 
 end)()
 
--- ── core/gpu_chams.lua ──
-June._mods["core.gpu_chams"] = (function()
--- GPU instance chams with a double-buffer applied set.
--- front (owner.applied) = addresses currently stamped
--- back  (fresh collect) = addresses that SHOULD be chammed this tick
--- Removals → RevertChams + rebuild all active owners.
--- Additions → incremental ApplyChamsToInstance only.
-
-local settings = June.require("core.settings")
-local env = June.require("core.env")
+-- ── core/health.lua ──
+June._mods["core.health"] = (function()
+local constants = June.require("core.constants")
+local cache = June.require("core.cache")
 
 local M = {}
 
-M.MODE_LABELS = { "Fill", "Wireframe", "Fill Glow", "Wireframe Glow" }
-M.COLOR_LABELS = { "Default", "Red", "Green", "Yellow", "Blue", "Magenta", "Cyan" }
+local HEALTH_CACHE_TIMEOUT = constants.HEALTH_CACHE_TIMEOUT
 
-local PART_CLASSES = {
-    Part = true,
-    MeshPart = true,
-    WedgePart = true,
-    CornerWedgePart = true,
-    TrussPart = true,
-    UnionOperation = true,
-    NegateOperation = true,
-}
-
-local owners = {}
-local owner_order = {}
-local rebuild_busy = false
-local last_global_rebuild = 0
-local MIN_REBUILD_GAP_MS = 400
-
-function M.available()
-    return exploits ~= nil
-        and type(exploits.ApplyChamsToInstance) == "function"
-        and type(exploits.RevertChams) == "function"
-        and type(exploits.SetChamsMode) == "function"
-        and type(exploits.SetChamsColor) == "function"
-end
-
-function M.is_part(inst)
-    if not inst then
-        return false
-    end
-    local cn = inst.ClassName or inst.class_name
-    if PART_CLASSES[cn] then
-        return true
-    end
-    return env.safe_call(function()
-        if inst.is_a then
-            return inst:is_a("BasePart")
-        end
-        if inst.IsA then
-            return inst:IsA("BasePart")
-        end
-        return false
-    end) == true
-end
-
-function M.instance_addr(inst)
-    if not inst then
+local function safe_num(v)
+    local n = tonumber(v)
+    if n == nil then
         return nil
     end
-    return inst.Address or inst.address
+    return n
 end
 
-function M.color_visible_for_mode(mode)
-    mode = tonumber(mode) or 0
-    return mode == 2 or mode == 3
+local function entity_health(ep)
+    if not ep then
+        return nil, nil, nil
+    end
+
+    local ok_alive, is_alive = pcall(function()
+        return ep.is_alive
+    end)
+    if ok_alive and is_alive == false then
+        local max_hp = safe_num(ep.max_health) or 125
+        return 0, max_hp, false
+    end
+
+    local ok_dead, is_dead = pcall(function()
+        return ep.is_dead
+    end)
+    if ok_dead and is_dead == true then
+        local max_hp = safe_num(ep.max_health) or 125
+        return 0, max_hp, false
+    end
+
+    local ok_hp, hp = pcall(function()
+        return ep.health
+    end)
+    local ok_mhp, mhp = pcall(function()
+        return ep.max_health
+    end)
+    if ok_hp and hp ~= nil then
+        hp = safe_num(hp)
+        mhp = ok_mhp and safe_num(mhp) or 125
+        if hp ~= nil then
+            return hp, mhp or 125, hp > 0
+        end
+    end
+
+    return nil, nil, nil
 end
 
-function M.mode_index(id, default)
-    return settings.combo_index(id, M.MODE_LABELS, default or 0)
+local function humanoid_health(char_data)
+    if not char_data or not char_data.hum then
+        return nil, nil, nil
+    end
+    local hum = char_data.hum
+    local hp = safe_num(hum.Health)
+    local mhp = safe_num(hum.MaxHealth)
+    if hp == nil then
+        return nil, nil, nil
+    end
+    return hp, mhp or 125, hp > 0
 end
 
-function M.color_index(id, default)
-    return settings.combo_index(id, M.COLOR_LABELS, default or 0)
+local function cache_health(name, hp, mhp)
+    if not name or hp == nil then
+        return hp, mhp
+    end
+    local now = os.clock()
+    local entry = cache.health_cache[name]
+    if not entry then
+        cache.health_cache[name] = {health = hp, max_health = mhp or 125, updated_at = now}
+        return hp, mhp
+    end
+
+    if hp < entry.health then
+        entry.health = hp
+        entry.max_health = mhp or entry.max_health or 125
+        entry.updated_at = now
+    elseif mhp and mhp > (entry.max_health or 0) then
+        entry.max_health = mhp
+    end
+
+    if now - (entry.updated_at or 0) > HEALTH_CACHE_TIMEOUT and hp > entry.health then
+        entry.health = hp
+        entry.max_health = mhp or entry.max_health or 125
+        entry.updated_at = now
+    end
+
+    return entry.health, entry.max_health
 end
 
-function M.multicombo_selected(id, index)
-    local t = settings.get(id)
-    if type(t) ~= "table" then
+function M.is_viewmodel_dead(vm)
+    if not vm then
+        return true
+    end
+
+    local parent = vm.Parent
+    if parent then
+        if parent.Name == "Garbage" then
+            return true
+        end
+        local grand = parent.Parent
+        if grand and grand.Name == "Garbage" then
+            return true
+        end
+    end
+
+    local torso = vm:FindFirstChild("torso")
+    if torso and torso.Transparency and torso.Transparency >= 1 then
+        return true
+    end
+
+    local head = vm:FindFirstChild("head")
+    if not head or not head.Position then
+        return true
+    end
+
+    return false
+end
+
+function M.resolve(name, entity_obj, char_data, viewmodel)
+    if M.is_viewmodel_dead(viewmodel) then
+        cache_health(name, 0, 125)
+        return 0, 125, false
+    end
+
+    local hp, mhp, alive = entity_health(entity_obj)
+    if hp == nil then
+        hp, mhp, alive = humanoid_health(char_data)
+    end
+
+    if hp == nil then
+        hp, mhp = 100, 125
+        alive = true
+    end
+
+    hp, mhp = cache_health(name, hp, mhp)
+    alive = hp > 0 and not M.is_viewmodel_dead(viewmodel)
+    return hp, mhp or 125, alive
+end
+
+function M.apply(entry, entity_obj, char_data)
+    if not entry then
         return false
     end
-    local v = t[index]
-    return v == true or v == 1
+    local hp, mhp, alive = M.resolve(entry.name, entity_obj, char_data, entry.viewmodel)
+    entry.health = hp
+    entry.max_health = mhp
+    entry.is_alive = alive
+    return alive
 end
 
-function M.multicombo_any(id, count)
-    for i = 1, count do
-        if M.multicombo_selected(id, i) then
-            return true
-        end
+function M.enabled(s)
+    if not s then
+        return true
     end
-    return false
-end
-
-function M.multicombo_defaults(count)
-    local out = {}
-    for i = 1, count do
-        out[i] = false
-    end
-    return out
-end
-
-local function now_ms()
-    return utility and utility.get_tick_count and utility.get_tick_count() or 0
-end
-
-local function push_style(mode, color)
-    pcall(function()
-        exploits.SetChamsMode(mode or 0)
-    end)
-    pcall(function()
-        exploits.SetChamsColor(color or 0)
-    end)
-end
-
-local function any_other_active(except_id)
-    for _, oid in ipairs(owner_order) do
-        local o = owners[oid]
-        if o and oid ~= except_id and o.is_active() then
-            return true
-        end
-    end
-    return false
-end
-
-local function sets_equal(a, b)
-    for k in pairs(a) do
-        if not b[k] then
-            return false
-        end
-    end
-    for k in pairs(b) do
-        if not a[k] then
-            return false
-        end
+    if s.health_check == false then
+        return false
     end
     return true
 end
 
-local function has_removed(prev, fresh)
-    for addr in pairs(prev) do
-        if not fresh[addr] then
-            return true
+function M.passes(s, entry)
+    if not M.enabled(s) then
+        return true
+    end
+    if not entry then
+        return false
+    end
+    if entry.is_alive == false then
+        return false
+    end
+    return (entry.health or 0) > 0 and not M.is_viewmodel_dead(entry.viewmodel)
+end
+
+function M.prune_cache(active_names)
+    local now = os.clock()
+    for name, entry in pairs(cache.health_cache) do
+        if not active_names[name] or now - (entry.updated_at or 0) > HEALTH_CACHE_TIMEOUT * 4 then
+            cache.health_cache[name] = nil
         end
     end
-    return false
 end
 
-local function apply_one(inst, applied)
-    if not M.available() or not inst then
-        return false
-    end
-    if not M.is_part(inst) then
-        return false
-    end
-    local addr = M.instance_addr(inst)
-    if not addr then
-        return false
-    end
-    if applied[addr] then
-        return true
-    end
-    local ok, result = pcall(exploits.ApplyChamsToInstance, inst)
-    if ok and result then
-        applied[addr] = true
-        return true
-    end
-    return false
+return M
+
+end)()
+
+-- ── game/combat_origin.lua ──
+June._mods["game.combat_origin"] = (function()
+local env = June.require("core.env")
+local cache = June.require("core.cache")
+
+local M = {}
+
+local frame = {t = 0, muzzle = nil, server = nil}
+
+local MUZZLE_NAMES = {"Muzzle", "FlashPart", "Flash", "BarrelPart", "UpperBarrel", "Barrel", "Grip"}
+
+local function tick_ms()
+    return utility and utility.get_tick_count and utility.get_tick_count() or 0
 end
 
-function M.cham_part(inst, applied)
-    return apply_one(inst, applied or {})
-end
-
-function M.find_main_part(model, hints)
-    if not model or not env.is_valid(model) then
+local function part_pos(part)
+    if not part then
         return nil
     end
-    hints = hints or {}
-    for i = 1, #hints do
-        local name = hints[i]
-        local p = env.safe_call(function()
-            return model:FindFirstChild(name)
-        end)
-        if p and M.is_part(p) then
-            return p
+    local pos = part.Position or part.position
+    if not pos then
+        return nil
+    end
+    local x = pos.X or pos.x
+    local y = pos.Y or pos.y
+    local z = pos.Z or pos.z
+    if not x then
+        return nil
+    end
+    return {x = x, y = y, z = z}
+end
+
+local function find_named_part(root)
+    if not root or not root.GetDescendants then
+        return nil
+    end
+    for _, name in ipairs(MUZZLE_NAMES) do
+        local direct = root:FindFirstChild(name)
+        if direct and direct.Position then
+            return direct
         end
     end
-    local children = env.safe_call(function()
-        return model:GetChildren()
-    end) or {}
-    for _, c in ipairs(children) do
-        if M.is_part(c) then
-            return c
+    for _, desc in ipairs(root:GetDescendants()) do
+        for _, name in ipairs(MUZZLE_NAMES) do
+            if desc.Name == name and desc.Position then
+                return desc
+            end
         end
-    end
-    if M.is_part(model) then
-        return model
     end
     return nil
 end
 
-function M.cham_entry_part(entry, applied)
-    if not entry then
-        return false
+local function local_viewmodel()
+    if not cache.ws then
+        return nil
     end
-    local part = entry.main_part or entry.anchor
-    if part and env.is_valid(part) and M.is_part(part) then
-        return apply_one(part, applied)
+    local vms = cache.ws:FindFirstChild("Viewmodels")
+    if not vms then
+        return nil
     end
-    local model = entry.obj or entry.inst or entry.viewmodel
-    if not model or not env.is_valid(model) then
-        return false
-    end
-    local hints = {"Root", "Main", "HumanoidRootPart", "Cam"}
-    if entry.item then
-        if entry.item.priority_part then
-            table.insert(hints, 1, entry.item.priority_part)
-        end
-        if entry.item.anchor_part then
-            table.insert(hints, 1, entry.item.anchor_part)
-        end
-    end
-    local main = M.find_main_part(model, hints)
-    if main then
-        entry.main_part = main
-        return apply_one(main, applied)
-    end
-    return false
+    return vms:FindFirstChild("LocalViewmodel")
 end
 
-function M.register_owner(id, opts)
-    opts = opts or {}
-    if not owners[id] then
-        owner_order[#owner_order + 1] = id
+local function find_weapon_model(vm)
+    if not vm then
+        return nil
     end
-    owners[id] = {
-        id = id,
-        applied = {},
-        was_active = false,
-        is_active = opts.is_active or function()
-            return false
-        end,
-        style = opts.style or function()
-            return 0, 0
-        end,
-        collect = opts.collect or function(_back)
-        end,
-        last_rescan = 0,
-        rescan_ms = opts.rescan_ms or 500,
-    }
-    return owners[id]
-end
-
-function M.get_owner(id)
-    return owners[id]
-end
-
-local function apply_owner_into(owner, into)
-    if not owner or not owner.is_active() then
-        return
-    end
-    local mode, color = owner.style()
-    push_style(mode, color)
-    pcall(owner.collect, into)
-end
-
-function M.rebuild_all()
-    if not M.available() or rebuild_busy then
-        return false
-    end
-    local now = now_ms()
-    if last_global_rebuild ~= 0 and (now - last_global_rebuild) < MIN_REBUILD_GAP_MS then
-        return false
-    end
-    last_global_rebuild = now
-    rebuild_busy = true
-
-    pcall(function()
-        exploits.RevertChams()
-    end)
-
-    for _, id in ipairs(owner_order) do
-        local owner = owners[id]
-        if owner then
-            owner.applied = {}
-            owner.last_rescan = 0
-        end
-    end
-
-    for _, id in ipairs(owner_order) do
-        local owner = owners[id]
-        if owner and owner.is_active() then
-            local back = {}
-            apply_owner_into(owner, back)
-            owner.applied = back
-            owner.was_active = true
-        elseif owner then
-            owner.was_active = false
-        end
-    end
-
-    rebuild_busy = false
-    return true
-end
-
-function M.revert_all()
-    if not M.available() then
-        return
-    end
-    pcall(function()
-        exploits.RevertChams()
-    end)
-    last_global_rebuild = now_ms()
-    for _, id in ipairs(owner_order) do
-        local owner = owners[id]
-        if owner then
-            owner.applied = {}
-            owner.was_active = false
-            owner.last_rescan = 0
-        end
-    end
-end
-
-function M.clear_owner(id, rebuild_others)
-    local owner = owners[id]
-    if not owner then
-        return
-    end
-    local had = owner.was_active or next(owner.applied) ~= nil
-    owner.applied = {}
-    owner.was_active = false
-    owner.last_rescan = 0
-    if not had or rebuild_others == false then
-        return
-    end
-    if any_other_active(id) then
-        M.rebuild_all()
-    else
-        M.revert_all()
-    end
-end
-
-function M.refresh_owner_style(id)
-    local owner = owners[id]
-    if not owner then
-        return
-    end
-    if not owner.is_active() then
-        M.clear_owner(id)
-        return
-    end
-    -- Style change must re-stamp; one global rebuild keeps multi-color owners stable.
-    M.rebuild_all()
-end
-
--- Collect desired address sets for every owner without applying.
--- Returns: need_rebuild, pending_adds { [owner_id] = { addr = true, ... } }
-local function collect_all_backs(force)
-    local now = now_ms()
-    local need_rebuild = false
-    local pending_adds = {}
-
-    for _, id in ipairs(owner_order) do
-        local owner = owners[id]
-        if not owner then
-            goto continue
-        end
-
-        if not owner.is_active() then
-            if owner.was_active or next(owner.applied) ~= nil then
-                need_rebuild = true
-                owner.applied = {}
-                owner.was_active = false
-                owner.last_rescan = 0
-                owner.missing = {}
-            end
-            goto continue
-        end
-
-        local due = force
-            or owner.last_rescan == 0
-            or (now - owner.last_rescan) >= owner.rescan_ms
-        if not due then
-            owner.was_active = true
-            goto continue
-        end
-
-        owner.last_rescan = now
-        owner.was_active = true
-        owner.missing = owner.missing or {}
-
-        local back = {}
-        -- Collect only — apply phase sets style per owner.
-        local ok = pcall(owner.collect, back)
-        if not ok then
-            goto continue
-        end
-
-        -- Grace: keep addresses missing for one rescan to avoid edge flicker.
-        local front = owner.applied
-        for addr in pairs(front) do
-            if not back[addr] then
-                local misses = (owner.missing[addr] or 0) + 1
-                owner.missing[addr] = misses
-                if misses < 2 then
-                    back[addr] = true
-                end
-            else
-                owner.missing[addr] = nil
-            end
-        end
-        for addr in pairs(back) do
-            if front[addr] then
-                owner.missing[addr] = nil
-            end
-        end
-
-        if sets_equal(front, back) then
-            goto continue
-        end
-
-        if has_removed(front, back) or next(front) == nil then
-            need_rebuild = true
-            owner._pending_back = back
-        else
-            local adds = {}
-            for addr in pairs(back) do
-                if not front[addr] then
-                    adds[addr] = true
-                end
-            end
-            if next(adds) then
-                pending_adds[id] = adds
-                owner._pending_back = back
-            end
-        end
-        ::continue::
-    end
-
-    return need_rebuild, pending_adds
-end
-
--- Single per-frame sync for all owners.
--- Prevents multi-color flashing: at most one RevertChams, then each owner
--- pushes its own mode/color and stamps its parts in order.
-function M.sync_all(force)
-    if not M.available() or rebuild_busy then
-        return
-    end
-
-    local need_rebuild, pending_adds = collect_all_backs(force)
-
-    if need_rebuild then
-        if M.rebuild_all() then
-            for _, id in ipairs(owner_order) do
-                local owner = owners[id]
-                if owner then
-                    owner._pending_back = nil
-                    owner.missing = {}
-                end
-            end
-        end
-        return
-    end
-
-    -- Incremental additions only — stamp with each owner's style, never revert.
-    for _, id in ipairs(owner_order) do
-        local adds = pending_adds[id]
-        local owner = owners[id]
-        if owner and adds and next(adds) then
-            local mode, color = owner.style()
-            push_style(mode, color)
-            local front = owner.applied
-            for addr in pairs(adds) do
-                if not front[addr] then
-                    pcall(exploits.ApplyChamsToInstance, addr)
-                    front[addr] = true
-                end
-            end
-            if owner._pending_back then
-                owner.applied = owner._pending_back
-                owner._pending_back = nil
-            else
-                owner.applied = front
+    for _, child in ipairs(vm:GetChildren()) do
+        if child.ClassName == "Model" and not cache.body_part_names[child.Name] then
+            if child:FindFirstChild("Magazine") or find_named_part(child) then
+                return child
             end
         end
     end
+    return nil
 end
 
-function M.sync_owner(id, force)
-    -- Always coalesce through sync_all so multi-owner colors stay stable.
-    M.sync_all(force == true)
+local function compute_muzzle()
+    local vm = local_viewmodel()
+    if vm then
+        local weapon = find_weapon_model(vm)
+        local part = find_named_part(weapon) or find_named_part(vm)
+        local pos = part_pos(part)
+        if pos then
+            return pos
+        end
+        local head = vm:FindFirstChild("head")
+        pos = part_pos(head)
+        if pos then
+            return pos
+        end
+    end
+
+    if camera and camera.get_position then
+        local ok, pos = pcall(camera.get_position)
+        if ok and pos then
+            local x = pos.X or pos.x
+            local y = pos.Y or pos.y
+            local z = pos.Z or pos.z
+            if x then
+                return {x = x, y = y, z = z}
+            end
+        end
+    end
+
+    return nil
 end
 
-function M.wire_style_controls(owner_id, mode_id, color_id)
-    if not menu or not menu.set_visible then
+local function compute_server()
+    if entity and entity.get_local_player then
+        local lp = entity.get_local_player()
+        if lp and lp.position then
+            local p = lp.position
+            local x = p.X or p.x
+            local y = p.Y or p.y
+            local z = p.Z or p.z
+            if x then
+                return {x = x, y = y, z = z}
+            end
+        end
+    end
+
+    local lp = env.get_local_player()
+    if lp then
+        local char = lp.character or lp.Character
+        if char then
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            local pos = part_pos(hrp)
+            if pos then
+                return pos
+            end
+        end
+    end
+
+    return nil
+end
+
+function M.invalidate()
+    frame.t = 0
+    frame.muzzle = nil
+    frame.server = nil
+end
+
+function M.sync()
+    local now = tick_ms()
+    if frame.t == now and frame.muzzle and frame.server then
         return
     end
+    frame.t = now
+    frame.muzzle = compute_muzzle()
+    frame.server = compute_server()
+end
 
-    local function sync_color_vis()
-        local mode = M.mode_index(mode_id, 0)
-        pcall(menu.set_visible, color_id, M.color_visible_for_mode(mode))
+function M.get_muzzle_origin()
+    M.sync()
+    return frame.muzzle
+end
+
+function M.get_server_origin()
+    M.sync()
+    return frame.server
+end
+
+function M.has_weapon()
+    return find_weapon_model(local_viewmodel()) ~= nil
+end
+
+function M.get_camera_origin()
+    if camera and camera.get_position then
+        local ok, pos = pcall(camera.get_position)
+        if ok and pos then
+            local x = pos.X or pos.x
+            local y = pos.Y or pos.y
+            local z = pos.Z or pos.z
+            if x then
+                return {x = x, y = y, z = z}
+            end
+        end
     end
-
-    settings.on_change(mode_id, function()
-        sync_color_vis()
-        M.refresh_owner_style(owner_id)
-    end)
-    settings.on_change(color_id, function()
-        M.refresh_owner_style(owner_id)
-    end)
-    sync_color_vis()
+    return nil
 end
 
 return M
@@ -3218,10 +3009,13 @@ local shootable_gadgets = June.require("game.shootable_gadgets")
 local M = {}
 
 local bbox_from_part = draw_util.bbox_from_part
+local bbox_center = draw_util.bbox_center
+local get_model_bbox = draw_util.get_model_bbox
 local get_world_item_position = draw_util.get_world_item_position
 local dist3d_sq = draw_util.dist3d_sq
 
-local GADGET_BBOX_MAX_PARTS = 12
+local GADGET_BBOX_MAX_PARTS = 14
+local BBOX_REFRESH_MS = 200
 
 local map_camera_folders = nil
 local map_camera_folders_at = 0
@@ -3288,11 +3082,60 @@ local function unpack_pos(pos)
     return x, y, z
 end
 
-local function gadget_bbox(item, anchor)
+local function gadget_bbox(obj, item, anchor)
+    local bbox = get_model_bbox(obj, GADGET_BBOX_MAX_PARTS)
+    if bbox then
+        return bbox
+    end
     if anchor then
         return bbox_from_part(anchor)
     end
     return nil
+end
+
+local function resolve_world_position(obj, item, anchor, bbox)
+    if bbox then
+        local center = bbox_center(bbox)
+        if center then
+            return center.x, center.y, center.z
+        end
+    end
+
+    local pos = get_world_item_position(obj, item)
+    if pos then
+        return unpack_pos(pos)
+    end
+
+    if anchor then
+        return unpack_pos(anchor.Position or anchor.position)
+    end
+
+    return nil
+end
+
+local function refresh_entry_bbox(entry, force)
+    if not entry or not entry.obj then
+        return
+    end
+    local now = tick_ms()
+    if not force and not entry.dynamic and not entry.map_only then
+        if entry.bbox and entry._bbox_at and now - entry._bbox_at < BBOX_REFRESH_MS * 4 then
+            return
+        end
+    end
+    if not force and entry._bbox_at and now - entry._bbox_at < BBOX_REFRESH_MS then
+        return
+    end
+
+    local bbox = gadget_bbox(entry.obj, entry.item, entry.anchor)
+    if bbox then
+        entry.bbox = bbox
+        entry._bbox_at = now
+        local cx, cy, cz = resolve_world_position(entry.obj, entry.item, entry.anchor, bbox)
+        if cx then
+            entry.x, entry.y, entry.z = cx, cy, cz
+        end
+    end
 end
 
 local function get_map_camera_folders(ws)
@@ -3325,39 +3168,8 @@ local function get_map_camera_folders(ws)
     return folders
 end
 
-local function world_chams_selected(index, s)
-    local opts = s.world_engine_chams
-    if type(opts) ~= "table" then
-        return false
-    end
-    local v = opts[index]
-    return v == true or v == 1
-end
-
-local function item_wanted_for_chams(item, s)
-    if not s.world_enabled or not item then
-        return false
-    end
-    for i, wi in ipairs(world_items.world_items) do
-        if wi.enabled == item.enabled then
-            return world_chams_selected(i, s)
-        end
-    end
-    return false
-end
-
-local function map_cam_wanted_for_chams(s)
-    if not s.world_enabled then
-        return false
-    end
-    return world_chams_selected(#world_items.world_items + 1, s)
-end
-
 local function should_scan_item(item, s, utilities_active, gadget_aim_active)
     if s[item.enabled] then
-        return true
-    end
-    if item_wanted_for_chams(item, s) then
         return true
     end
     if gadget_aim_active and shootable_gadgets.is_shootable_item(item) then
@@ -3406,24 +3218,26 @@ local function make_entry(obj, item, s, cam_x, cam_y, cam_z, max_sq, hide_sq, sq
     end
 
     local pos, sz = get_world_item_position(obj, scan_item)
-    if not pos then
-        local x, y, z = unpack_pos(anchor.Position or anchor.position)
-        if not x then
-            return nil
-        end
-        pos = {X = x, Y = y, Z = z}
-        sz = anchor.Size or anchor.size
-    end
-
-    local px, py, pz = unpack_pos(pos)
+    local bbox = gadget_bbox(obj, scan_item, anchor)
+    local px, py, pz = resolve_world_position(obj, scan_item, anchor, bbox)
     if not px then
-        return nil
+        if not pos then
+            px, py, pz = unpack_pos(anchor.Position or anchor.position)
+            if not px then
+                return nil
+            end
+        else
+            px, py, pz = unpack_pos(pos)
+            if not px then
+                return nil
+            end
+        end
+        sz = anchor.Size or anchor.size
     end
 
     local dsq = dist3d_sq(px, py, pz, cam_x, cam_y, cam_z)
     local is_dynamic = (item and item.dynamic == true) or for_aim
-    local for_chams = (item and item_wanted_for_chams(item, s)) or (camera_item and map_cam_wanted_for_chams(s))
-    if not in_draw_range(dsq, max_sq, hide_sq, is_dynamic or for_chams, for_aim or for_chams) then
+    if not in_draw_range(dsq, max_sq, hide_sq, is_dynamic, for_aim) then
         return nil
     end
 
@@ -3440,7 +3254,7 @@ local function make_entry(obj, item, s, cam_x, cam_y, cam_z, max_sq, hide_sq, sq
         y = py,
         z = pz,
         size = sz,
-        bbox = gadget_bbox(scan_item, anchor),
+        bbox = bbox,
         label = label,
         color = s[color_key .. "_color"] or {1, 1, 1, 1},
         obj = obj,
@@ -3456,6 +3270,7 @@ local function make_entry(obj, item, s, cam_x, cam_y, cam_z, max_sq, hide_sq, sq
         map_only = camera_item and camera_item.map_only == true,
         is_teammate_gadget = gadget_team.is_friendly_gadget(obj),
         is_broken = gadget_lifecycle.is_broken(obj, scan_item, anchor),
+        _bbox_at = tick_ms(),
     }
 end
 
@@ -3477,21 +3292,6 @@ function M.get_max_sq(s, utilities_active)
     local max_dist = s.world_max_distance or 250
     if utilities_active then
         max_dist = math.max(max_dist, s.utilities_max_distance or 75)
-    end
-    if s.world_enabled then
-        local opts = s.world_engine_chams
-        local any_chams = false
-        if type(opts) == "table" then
-            for i = 1, #opts do
-                if opts[i] == true or opts[i] == 1 then
-                    any_chams = true
-                    break
-                end
-            end
-        end
-        if any_chams then
-            max_dist = math.max(max_dist, s.world_engine_chams_range or 250)
-        end
     end
     return max_dist * max_dist
 end
@@ -3542,7 +3342,6 @@ function M.sync_map_cameras(ws, s, utilities_active, cache, cam_x, cam_y, cam_z,
     end
 
     local enabled = s[default_camera.enabled]
-        or map_cam_wanted_for_chams(s)
         or (utilities_active and TARGETABLE_UTILITIES["MAP CAM"])
         or (gadget_aim_active and shootable_gadgets.is_shootable_item(default_camera))
 
@@ -3598,32 +3397,19 @@ function M.refresh_entry_position(entry, cam_x, cam_y, cam_z, sqrt)
         entry.anchor = anchor
     end
 
-    local x, y, z
-    if entry.map_only then
-        x, y, z = unpack_pos(anchor.Position or anchor.position)
-    else
-        local pos = get_world_item_position(entry.obj, entry.item)
-        if pos then
-            x, y, z = unpack_pos(pos)
-        else
-            x, y, z = unpack_pos(anchor.Position or anchor.position)
+    refresh_entry_bbox(entry, entry.dynamic == true)
+
+    if not entry.x then
+        local cx, cy, cz = resolve_world_position(entry.obj, entry.item, anchor, entry.bbox)
+        if not cx then
+            return false
         end
+        entry.x, entry.y, entry.z = cx, cy, cz
     end
 
-    if not x then
-        return false
-    end
-
-    entry.x = x
-    entry.y = y
-    entry.z = z
-    local dsq = dist3d_sq(x, y, z, cam_x, cam_y, cam_z)
+    local dsq = dist3d_sq(entry.x, entry.y, entry.z, cam_x, cam_y, cam_z)
     entry.dsq = dsq
     entry.dist = sqrt(dsq)
-
-    if entry.dynamic or entry.map_only then
-        entry.bbox = gadget_bbox(entry.item, anchor)
-    end
     return true
 end
 
@@ -3689,12 +3475,13 @@ local env = June.require("core.env")
 local M = {}
 
 local hook_ready = false
-local tracking = false
-local MOUSE_RAY_LEN = 1024
+local armed = false
+local SHOOT_VK = 0x01
 
 M._last_origin = nil
 M._last_target = nil
 M._last_ok = false
+M._last_track_key = nil
 
 local function unpack_pos(v)
     if not v then return nil end
@@ -3710,6 +3497,17 @@ local function make_vec3(x, y, z)
     return { x = x, y = y, z = z }
 end
 
+local function shoot_key(vk)
+    return vk or SHOOT_VK
+end
+
+local function lmb_down(vk)
+    if not input or not input.is_key_down then
+        return false
+    end
+    return input.is_key_down(shoot_key(vk)) == true
+end
+
 function M.available()
     return raycast
         and raycast.track_silent_target
@@ -3717,22 +3515,31 @@ function M.available()
 end
 
 function M.ensure_hook()
-    if not M.available() then return false end
+    if not M.available() then
+        return false
+    end
     if hook_ready or (raycast.is_silent_hook_active and raycast.is_silent_hook_active()) then
         hook_ready = true
+        armed = true
         return true
     end
     if not raycast.enable_silent_hook then
         hook_ready = true
+        armed = true
         return true
     end
     local ok = raycast.enable_silent_hook()
     hook_ready = ok == true
+    armed = hook_ready
     return hook_ready
 end
 
+function M.is_armed()
+    return armed
+end
+
 function M.is_tracking()
-    return tracking
+    return armed and M._last_ok
 end
 
 function M.get_camera_origin()
@@ -3762,8 +3569,11 @@ function M.stop()
     M._last_origin = nil
     M._last_target = nil
     M._last_ok = false
-    tracking = false
-    if not M.available() then return end
+    M._last_track_key = nil
+    armed = false
+    if not M.available() then
+        return
+    end
     pcall(raycast.stop_silent_tracking)
     if raycast.clear_silent_target then
         pcall(raycast.clear_silent_target)
@@ -3774,17 +3584,43 @@ function M.last_segment()
     return M._last_origin, M._last_target
 end
 
-function M.track(origin, aim_point, shoot_vk)
+local function push_silent(origin_v, dir_v)
+    local pushed = false
+    if raycast.set_silent_target then
+        pushed = pcall(raycast.set_silent_target, origin_v, dir_v) == true
+    end
+    return pushed
+end
+
+local function push_track(origin_v, dir_v, key)
+    if not raycast.track_silent_target then
+        return false
+    end
+    local ok_call, ok = pcall(raycast.track_silent_target, origin_v, dir_v, key)
+    return ok_call and ok == true
+end
+
+-- API: direction = target - origin (NOT normalized, NOT scaled).
+function M.track(origin, aim_point, shoot_vk, hitpart, force)
     M._last_ok = false
-    if not aim_point then return false end
+    if not aim_point then
+        return false
+    end
+
+    if not M.ensure_hook() then
+        return false
+    end
 
     origin = origin or M.get_camera_origin()
-    if not origin then return false end
-    if not M.ensure_hook() then return false end
+    if not origin then
+        return false
+    end
 
     local ox, oy, oz = unpack_pos(origin)
     local ax, ay, az = unpack_pos(aim_point)
-    if not ox or not ax then return false end
+    if not ox or not ax then
+        return false
+    end
 
     local dx, dy, dz = ax - ox, ay - oy, az - oz
     local dist = math.sqrt(dx * dx + dy * dy + dz * dz)
@@ -3797,30 +3633,198 @@ function M.track(origin, aim_point, shoot_vk)
             dist = math.sqrt(dx * dx + dy * dy + dz * dz)
         end
         if not dist or dist < 0.001 then
-            dir = make_vec3(0, MOUSE_RAY_LEN * 0.01, 0)
+            dir = make_vec3(0, 1, 0)
         else
-            local inv = 1 / dist
-            dir = make_vec3(dx * inv * MOUSE_RAY_LEN, dy * inv * MOUSE_RAY_LEN, dz * inv * MOUSE_RAY_LEN)
+            dir = make_vec3(dx, dy, dz)
         end
     else
-        local inv = 1 / dist
-        dir = make_vec3(dx * inv * MOUSE_RAY_LEN, dy * inv * MOUSE_RAY_LEN, dz * inv * MOUSE_RAY_LEN)
+        dir = make_vec3(dx, dy, dz)
     end
 
     M._last_origin = { x = ox, y = oy, z = oz }
-    M._last_target = { x = ax, y = ay, z = az }
-
-    local origin_v = make_vec3(ox, oy, oz)
-    local key = shoot_vk or 0x01
-
-    local ok = raycast.track_silent_target(origin_v, dir, key) == true
-    if ok and raycast.set_silent_target then
-        pcall(raycast.set_silent_target, origin_v, dir)
+    if hitpart and hitpart.x then
+        M._last_target = { x = hitpart.x, y = hitpart.y, z = hitpart.z }
+    else
+        M._last_target = { x = ax, y = ay, z = az }
     end
 
-    M._last_ok = ok
-    tracking = ok
-    return ok
+    local key = shoot_key(shoot_vk)
+    local firing = lmb_down(key)
+    local track_key = string.format("%.3f|%.3f|%.3f|%.3f|%.3f|%.3f", ox, oy, oz, ax, ay, az)
+    if not force and not firing and M._last_track_key == track_key and M._last_ok then
+        return true
+    end
+
+    local origin_v = make_vec3(ox, oy, oz)
+    local pushed = push_silent(origin_v, dir)
+    local tracked = false
+    if force or firing then
+        tracked = push_track(origin_v, dir, key)
+    end
+
+    M._last_ok = pushed or tracked
+    armed = M._last_ok
+    if M._last_ok then
+        M._last_track_key = track_key
+    end
+    return M._last_ok
+end
+
+return M
+
+end)()
+
+-- ── core/combat_vis.lua ──
+June._mods["core.combat_vis"] = (function()
+-- Visibility with soft/breakable penetration (Op One: Items_29757 parts_on_ray logic).
+
+local M = {}
+
+local MAX_PENETRATIONS = 16
+local PENETRATE_ADVANCE = 0.08
+
+local function part_of(inst, root)
+    if not inst or not root then
+        return false
+    end
+    local p = inst
+    while p do
+        if p == root then
+            return true
+        end
+        p = p.Parent or p.parent
+    end
+    return false
+end
+
+local function attr_true(inst, name)
+    if not inst then
+        return false
+    end
+    if inst.GetAttribute then
+        local ok, v = pcall(inst.GetAttribute, inst, name)
+        if ok and v then
+            return true
+        end
+    end
+    if inst.getAttribute then
+        local ok, v = pcall(inst.getAttribute, inst, name)
+        if ok and v then
+            return true
+        end
+    end
+    return false
+end
+
+local function has_tag(inst, tag)
+    if not inst or not tag then
+        return false
+    end
+    if inst.HasTag then
+        local ok, v = pcall(inst.HasTag, inst, tag)
+        return ok and v == true
+    end
+    return false
+end
+
+function M.is_penetrable(inst)
+    if not inst then
+        return false
+    end
+    if attr_true(inst, "Soft") then
+        return true
+    end
+    if has_tag(inst, "Breakable") then
+        return true
+    end
+    local parent = inst.Parent or inst.parent
+    if parent then
+        if attr_true(parent, "Soft") then
+            return true
+        end
+        if has_tag(parent, "Breakable") then
+            return true
+        end
+    end
+    if inst.CanCollide == false and inst.Transparency and inst.Transparency < 1 then
+        return true
+    end
+    return false
+end
+
+function M.can_see(ox, oy, oz, tx, ty, tz, target_root, penetrate)
+    if not raycast then
+        return true
+    end
+    if raycast.is_ready and not raycast.is_ready() then
+        return false
+    end
+    if not ox or not tx then
+        return false
+    end
+
+    if not penetrate or not raycast.cast then
+        if raycast.is_visible then
+            return raycast.is_visible(ox, oy, oz, tx, ty, tz) == true
+        end
+        return true
+    end
+
+    local fx, fy, fz = ox, oy, oz
+    for _ = 1, MAX_PENETRATIONS do
+        local hit, _, dist, inst, is_terrain = raycast.cast(fx, fy, fz, tx, ty, tz)
+        if not hit then
+            return true
+        end
+        if is_terrain then
+            return false
+        end
+        if target_root and inst and part_of(inst, target_root) then
+            return true
+        end
+        if not M.is_penetrable(inst) then
+            return false
+        end
+
+        local dx, dy, dz = tx - fx, ty - fy, tz - fz
+        local len = math.sqrt(dx * dx + dy * dy + dz * dz)
+        if len < 0.02 then
+            return false
+        end
+        local step = (tonumber(dist) or 0) + PENETRATE_ADVANCE
+        if step >= len then
+            return true
+        end
+        local inv = 1 / len
+        fx = fx + dx * inv * step
+        fy = fy + dy * inv * step
+        fz = fz + dz * inv * step
+    end
+
+    return false
+end
+
+function M.can_see_player(cam_x, cam_y, cam_z, player, aim, penetrate, muzzle)
+    if not player then
+        return false
+    end
+    aim = aim or player.head_pos
+    if not aim then
+        return false
+    end
+
+    local tx, ty, tz = aim.x, aim.y, aim.z
+    local vm = player.viewmodel
+
+    if M.can_see(cam_x, cam_y, cam_z, tx, ty, tz, vm, penetrate) then
+        return true
+    end
+
+    if muzzle then
+        return M.can_see(muzzle.x, muzzle.y, muzzle.z, tx, ty, tz, vm, penetrate)
+    end
+
+    return false
 end
 
 return M
@@ -3916,23 +3920,260 @@ return M
 
 end)()
 
--- ── features/combat/silent_resolve.lua ──
-June._mods["features.combat.silent_resolve"] = (function()
-local silent_ray = June.require("core.silent_ray")
+-- ── features/combat/hitscan_ray.lua ──
+June._mods["features.combat.hitscan_ray"] = (function()
+-- Operation One hitscan — ray origin along muzzle→target (validate_position style).
+
+local combat_origin = June.require("game.combat_origin")
 
 local M = {}
 
-function M.resolve_track(aim)
+local BONE_CENTER_Y = {
+    head = -0.55,
+    torso = 0,
+    arm1 = 0,
+    arm2 = 0,
+    leg1 = -0.15,
+    leg2 = -0.15,
+}
+
+local function copy_pos(p)
+    if not p then return nil end
+    return { x = p.x, y = p.y, z = p.z }
+end
+
+local function unit(dx, dy, dz)
+    local len = math.sqrt(dx * dx + dy * dy + dz * dz)
+    if len < 0.001 then return 0, 0, 0, 0 end
+    local inv = 1 / len
+    return dx * inv, dy * inv, dz * inv, len
+end
+
+function M.target_center(hitpart, bone)
+    if not hitpart then return nil end
+    local c = copy_pos(hitpart)
+    local yoff = BONE_CENTER_Y[bone or "head"] or -0.4
+    c.y = c.y + yoff
+    return c
+end
+
+function M.build_path(origin, center, muzzle)
+    if not origin or not center then return {} end
+    local out = {}
+    if muzzle then out[#out + 1] = copy_pos(muzzle) end
+    out[#out + 1] = copy_pos(origin)
+    out[#out + 1] = copy_pos(center)
+    return out
+end
+
+-- Slide origin along muzzle→target to target depth (mimics Util.validate_position).
+function M.resolve(opts)
+    opts = opts or {}
+    local camera = opts.camera or combat_origin.get_camera_origin()
+    local hitpart = opts.hitpart
+    if not hitpart or not camera then return nil end
+
+    local bone = opts.bone or "head"
+    local center = M.target_center(hitpart, bone)
+    if not center then return nil end
+
+    local muzzle = opts.muzzle or combat_origin.get_muzzle_origin() or camera
+    local mx, my, mz, dist = unit(
+        center.x - muzzle.x,
+        center.y - muzzle.y,
+        center.z - muzzle.z
+    )
+    if dist < 0.05 then
+        return {
+            origin = copy_pos(center),
+            aim = copy_pos(center),
+            hitpart = center,
+            path = M.build_path(center, center, muzzle),
+        }
+    end
+
+    local origin = {
+        x = muzzle.x + mx * dist,
+        y = muzzle.y + my * dist,
+        z = muzzle.z + mz * dist,
+    }
+
+    local past = 3.0
+    local aim = {
+        x = center.x + mx * past,
+        y = center.y + my * past,
+        z = center.z + mz * past,
+    }
+
+    return {
+        origin = origin,
+        aim = aim,
+        hitpart = center,
+        path = M.build_path(origin, center, muzzle),
+    }
+end
+
+return M
+
+end)()
+
+-- ── features/combat/silent_resolve.lua ──
+June._mods["features.combat.silent_resolve"] = (function()
+local settings = June.require("core.settings")
+local silent_ray = June.require("core.silent_ray")
+local combat_origin = June.require("game.combat_origin")
+local hitscan_ray = June.require("features.combat.hitscan_ray")
+
+local M = {}
+
+M.last_info = { state = "off", origin = nil, aim = nil, path = nil }
+
+local BONE_NAMES = { [0] = "head", [1] = "torso", [2] = "arm1", [3] = "arm2", [4] = "leg1", [5] = "leg2" }
+
+local function bone_name(idx)
+    idx = tonumber(idx) or 0
+    if idx == 6 then return nil end
+    return BONE_NAMES[idx] or "head"
+end
+
+local function aim_past(origin, target, past)
+    if not origin or not target then
+        return nil
+    end
+    past = past or 3.0
+    local dx = target.x - origin.x
+    local dy = target.y - origin.y
+    local dz = target.z - origin.z
+    local len = math.sqrt(dx * dx + dy * dy + dz * dz)
+    if len < 0.001 then
+        return { x = target.x, y = target.y, z = target.z }
+    end
+    local scale = past / len
+    return {
+        x = target.x + dx * scale,
+        y = target.y + dy * scale,
+        z = target.z + dz * scale,
+    }
+end
+
+function M.resolve_track(aim, bone_idx, opts)
+    M.last_info = { state = "off", origin = nil, aim = nil, path = nil }
     if not aim then
-        return nil, nil
+        return nil, nil, nil
     end
 
-    local camera = silent_ray.get_camera_origin()
+    opts = opts or {}
+    local s = settings.s
+    local camera = silent_ray.get_camera_origin() or combat_origin.get_camera_origin()
     if not camera then
-        return nil, nil
+        return nil, nil, nil
     end
 
-    return camera, aim
+    combat_origin.invalidate()
+    local muzzle = combat_origin.get_muzzle_origin() or camera
+    local bone = bone_name(bone_idx or s.silent_bone)
+    local center = hitscan_ray.target_center(aim, bone) or aim
+
+    local use_hitscan = s.silent_hitscan == true
+
+    if use_hitscan then
+        local hs = hitscan_ray.resolve({
+            camera = camera,
+            hitpart = aim,
+            bone = bone,
+            muzzle = muzzle,
+        })
+        if hs and hs.origin and hs.aim then
+            M.last_info = {
+                state = "hitscan",
+                origin = hs.origin,
+                aim = hs.hitpart or center,
+                path = hs.path,
+            }
+            return hs.origin, hs.aim, center
+        end
+    end
+
+    -- Genuine silent aim: redirect engine ray from camera → hitpart.
+    local aim_far = aim_past(camera, center, 3.0)
+    if not aim_far then
+        return nil, nil, nil
+    end
+
+    M.last_info = {
+        state = "silent",
+        origin = camera,
+        aim = center,
+        path = hitscan_ray.build_path(camera, center, muzzle),
+    }
+    return camera, aim_far, center
+end
+
+return M
+
+end)()
+
+-- ── features/visuals/hitscan_visuals.lua ──
+June._mods["features.visuals.hitscan_visuals"] = (function()
+local settings = June.require("core.settings")
+
+local M = {}
+
+local function w2s(x, y, z)
+    if utility and utility.world_to_screen then
+        return utility.world_to_screen(x, y, z)
+    end
+    if draw and draw.world_to_screen then
+        return draw.world_to_screen(x, y, z)
+    end
+    return 0, 0, false
+end
+
+local function draw_link(a, b, col, thick)
+    if not a or not b then return end
+    local x1, y1, v1 = w2s(a.x, a.y, a.z)
+    local x2, y2, v2 = w2s(b.x, b.y, b.z)
+    if v1 and v2 then
+        draw.line(x1, y1, x2, y2, col, thick or 1)
+    end
+end
+
+local function draw_marker(pos, col, size)
+    if not pos then return end
+    local sx, sy, v = w2s(pos.x, pos.y, pos.z)
+    if not v then return end
+    local r = size or 5
+    draw.line(sx - r, sy, sx + r, sy, col, 2)
+    draw.line(sx, sy - r, sx, sy + r, col, 2)
+end
+
+function M.draw(info)
+    if not settings.s.silent_hitscan_vis then return end
+    if not info or (info.state ~= "hitscan" and info.state ~= "silent") then return end
+
+    local path = info.path
+    if not path or #path < 2 then return end
+
+    local line_col = info.state == "hitscan"
+        and {0.95, 0.45, 1, 0.9}
+        or {0.45, 0.75, 1, 0.85}
+    local hook_col = {1, 0.85, 0.2, 0.95}
+    local target_col = {0.4, 1, 0.5, 0.9}
+
+    local start_i = #path >= 3 and 2 or 1
+    for i = start_i, #path - 1 do
+        draw_link(path[i], path[i + 1], line_col, 1.5)
+    end
+
+    if #path >= 3 then
+        draw_link(path[1], path[2], {line_col[1], line_col[2], line_col[3], 0.55}, 1)
+    end
+
+    local hook = info.origin or path[start_i]
+    draw_marker(hook, hook_col, 5)
+
+    local target = path[#path]
+    draw_marker(target, target_col, 5)
 end
 
 return M
@@ -4118,10 +4359,12 @@ June._mods["features.combat.scan"] = (function()
 local constants = June.require("core.constants")
 local settings = June.require("core.settings")
 local cache = June.require("core.cache")
+local health = June.require("core.health")
 local world_scan = June.require("game.world_scan")
 local draw_util = June.require("core.draw_util")
 local shootable_gadgets = June.require("game.shootable_gadgets")
 local vis_util = June.require("core.vis_util")
+local combat_vis = June.require("core.combat_vis")
 
 local sqrt, min, max = constants.sqrt, constants.min, constants.max
 local DIST = constants.DIST
@@ -4287,12 +4530,10 @@ local function discover_player_from_vm(vm, cam_x, cam_y, cam_z, player_lookup)
         return nil
     end
 
-    local char_data = cache.char_models[char_obj]
-    local hp, mhp = 100, 125
-    if char_data and char_data.hum then
-        hp, mhp = char_data.hum.Health, char_data.hum.MaxHealth
-    end
-    if hp <= 0 then
+    local char_data = char_obj and cache.char_models[char_obj] or nil
+    local p_obj = player_lookup[cn]
+    local hp, mhp, alive = health.resolve(cn, p_obj, char_data, vm)
+    if not alive or hp <= 0 then
         return nil
     end
 
@@ -4314,7 +4555,6 @@ local function discover_player_from_vm(vm, cam_x, cam_y, cam_z, player_lookup)
         lv = {x = h.LookVector.X, y = h.LookVector.Y, z = h.LookVector.Z}
     end
 
-    local p_obj = player_lookup[cn]
     local php = (p_obj and p_obj.head_position) and
         {x = p_obj.head_position.x, y = p_obj.head_position.y, z = p_obj.head_position.z} or
         {x = hx, y = hy, z = hz}
@@ -4330,6 +4570,7 @@ local function discover_player_from_vm(vm, cam_x, cam_y, cam_z, player_lookup)
         weapon = wpn,
         health = hp,
         max_health = mhp,
+        is_alive = alive,
         is_teammate = is_teammate(vm),
         viewmodel = vm,
         char_obj = char_obj,
@@ -4369,13 +4610,8 @@ local function refresh_player_live(p, cam_x, cam_y, cam_z, player_lookup)
     p.bbox = bbox
     p.dist = sqrt(dsq)
 
-    if p.char_obj and cache.char_models[p.char_obj] and cache.char_models[p.char_obj].hum then
-        local hum = cache.char_models[p.char_obj].hum
-        p.health = hum.Health
-        p.max_health = hum.MaxHealth
-        if p.health <= 0 then
-            return false
-        end
+    if not health.apply(p, player_lookup[p.name], p.char_obj and cache.char_models[p.char_obj] or nil) then
+        return false
     end
 
     if h.LookVector then
@@ -4433,6 +4669,34 @@ local function update_visibility(cam_x, cam_y, cam_z)
         return
     end
 
+    local per_player = (s.players_visible_override and s.players_enabled)
+        or (s.silent_filter_visible and s.silent_aim_enabled)
+
+    local function should_check(p)
+        local valid_esp = s.players_enabled and (s.players_team or not p.is_teammate)
+        local valid_aim = s.aimbot_enabled and (not s.aimbot_team_check or not p.is_teammate)
+        local valid_silent = s.silent_aim_enabled and (not s.silent_filter_team or not p.is_teammate)
+        return (s.aimbot_vischeck and valid_aim)
+            or (s.silent_filter_visible and valid_silent)
+            or (s.players_visible_override and valid_esp)
+    end
+
+    local function check_player(p)
+        local penetrate = s.silent_filter_visible and s.silent_aim_enabled
+        return combat_vis.can_see_player(cam_x, cam_y, cam_z, p, p.head_pos, penetrate, nil)
+    end
+
+    if per_player then
+        for i = 1, #cache.players do
+            local p = cache.players[i]
+            p.is_visible = false
+            if should_check(p) then
+                p.is_visible = check_player(p)
+            end
+        end
+        return
+    end
+
     local min_val = math.huge
     local closest_p = nil
     local cx, cy = cache.screen_w * 0.5, cache.screen_h * 0.5
@@ -4440,14 +4704,7 @@ local function update_visibility(cam_x, cam_y, cam_z)
     for i = 1, #cache.players do
         local p = cache.players[i]
         p.is_visible = false
-        local valid_for_esp = s.players_enabled and (s.players_team or not p.is_teammate)
-        local valid_for_aim = s.aimbot_enabled and (not s.aimbot_team_check or not p.is_teammate)
-        local valid_for_silent = s.silent_aim_enabled and (not s.silent_filter_team or not p.is_teammate)
-        local need_vis = (s.aimbot_vischeck and valid_for_aim)
-            or (s.silent_filter_visible and valid_for_silent)
-            or (s.players_visible_override and valid_for_esp)
-
-        if need_vis and (valid_for_esp or valid_for_aim or valid_for_silent) then
+        if should_check(p) then
             if s.vis_check_priority == 1 and p.screen_vis then
                 local dist2d = sqrt((p.screen_cx - cx) ^ 2 + (p.screen_mny - cy) ^ 2)
                 if dist2d < min_val then
@@ -4461,11 +4718,8 @@ local function update_visibility(cam_x, cam_y, cam_z)
         end
     end
 
-    if closest_p and raycast and raycast.is_visible then
-        closest_p.is_visible = raycast.is_visible(
-            cam_x, cam_y, cam_z,
-            closest_p.head_pos.x, closest_p.head_pos.y, closest_p.head_pos.z
-        )
+    if closest_p then
+        closest_p.is_visible = check_player(closest_p)
     end
 end
 
@@ -4518,6 +4772,12 @@ function M.scan_players()
     end
 
     update_visibility(cam_x, cam_y, cam_z)
+
+    local active_names = {}
+    for i = 1, #cache.players do
+        active_names[cache.players[i].name] = true
+    end
+    health.prune_cache(active_names)
 
     if s.aimbot_target_type == AIM_TARGET.DISTANCE then
         table.sort(cache.players, function(a, b)
@@ -4619,6 +4879,7 @@ June._mods["features.combat.aimbot"] = (function()
 local constants = June.require("core.constants")
 local settings = June.require("core.settings")
 local cache = June.require("core.cache")
+local health = June.require("core.health")
 local shootable_gadgets = June.require("game.shootable_gadgets")
 
 local sqrt = constants.sqrt
@@ -4704,7 +4965,7 @@ local function is_target_valid(lt)
     end
     for _, p in ipairs(cache.players) do
         if p.viewmodel == lt.viewmodel then
-            return p.health > 0 and p.dist <= (s.aimbot_max_distance or 500)
+            return (not s.aimbot_health_check or health.passes(s, p)) and p.dist <= (s.aimbot_max_distance or 500)
         end
     end
     return false
@@ -4870,11 +5131,6 @@ function M.process_aimbot()
     local lmb_clicked = lmb_kd and not cache.aim.last_lmb_state
     cache.aim.last_lmb_state = lmb_kd
 
-    local sticky_on = s.aimbot_sticky and kd
-    if not sticky_on then
-        cache.aim.locked_target = nil
-    end
-
     if not kd then
         cache.aim.current_target = nil
         return
@@ -4884,29 +5140,11 @@ function M.process_aimbot()
     local fov = s.aimbot_fov or 125
     local smooth = s.aimbot_smooth or 5
 
-    if sticky_on and cache.aim.locked_target and is_target_valid(cache.aim.locked_target) then
-        local tpos = locked_world_pos()
-        if tpos then
-            local sx, sy = world_to_aim_screen(tpos.x, tpos.y, tpos.z)
-            if sx then
-                cache.aim.current_target = {
-                    target = cache.aim.locked_target,
-                    pos = tpos,
-                    screen_x = sx,
-                    screen_y = sy
-                }
-                aim_at_screen(sx, sy, cx, cy, smooth, lmb_kd, lmb_clicked)
-                return
-            end
-        end
-        cache.aim.locked_target = nil
-    end
-
     local best, bd = nil, math.huge
     local max_dist = s.aimbot_max_distance or 500
 
     for _, p in ipairs(cache.players) do
-        if p.health and p.health > 0
+        if (not s.aimbot_health_check or health.passes(s, p))
             and (not s.aimbot_team_check or not p.is_teammate)
             and p.dist <= max_dist
             and (not s.aimbot_vischeck or p.is_visible)
@@ -4968,9 +5206,6 @@ function M.process_aimbot()
 
     if best then
         cache.aim.current_target = best
-        if s.aimbot_sticky and not cache.aim.locked_target then
-            cache.aim.locked_target = best.target
-        end
         aim_at_screen(best.screen_x, best.screen_y, cx, cy, smooth, lmb_kd, lmb_clicked)
     else
         cache.aim.current_target = nil
@@ -4995,28 +5230,25 @@ June._mods["features.combat.silent_aim"] = (function()
 local constants = June.require("core.constants")
 local settings = June.require("core.settings")
 local cache = June.require("core.cache")
+local health = June.require("core.health")
 local silent_ray = June.require("core.silent_ray")
 local silent_resolve = June.require("features.combat.silent_resolve")
+local hitscan_visuals = June.require("features.visuals.hitscan_visuals")
 local shootable_gadgets = June.require("game.shootable_gadgets")
+local combat_origin = June.require("game.combat_origin")
+local combat_vis = June.require("core.combat_vis")
 
 local sqrt = constants.sqrt
 local AIM_TARGET = constants.AIM_TARGET
 local SHOOT_VK = 0x01
-local TARGET_SCAN_MS = 33
+local WEAPON_CHECK_MS = 80
 
 local M = {}
 local s = settings.s
 local locked_target = nil
-local last_target_scan = 0
-local weapon_hold_ticks = 0
+local last_weapon_check = 0
+local weapon_holding = false
 local bone_map = {[0] = "head", [1] = "torso", [2] = "arm1", [3] = "arm2", [4] = "leg1", [5] = "leg2"}
-
-local function silent_vis_enabled()
-    if menu and menu.get then
-        return menu.get("silent_filter_visible") == true
-    end
-    return s.silent_filter_visible == true
-end
 
 local function tick_ms()
     return utility and utility.get_tick_count and utility.get_tick_count() or 0
@@ -5050,27 +5282,17 @@ local function live_world_entry(entry)
 end
 
 local function holding_weapon()
-    if not cache.ws then
-        weapon_hold_ticks = math.max(0, weapon_hold_ticks - 1)
-        return weapon_hold_ticks > 0
+    local now = tick_ms()
+    if now - last_weapon_check < WEAPON_CHECK_MS then
+        return weapon_holding
     end
-    local vms = cache.ws:FindFirstChild("Viewmodels")
-    local local_vm = vms and vms:FindFirstChild("LocalViewmodel")
-    local has_weapon = false
-    if local_vm then
-        for _, child in ipairs(local_vm:GetChildren()) do
-            if child.ClassName == "Model" and not cache.body_part_names[child.Name] and child:FindFirstChild("Magazine") then
-                has_weapon = true
-                break
-            end
-        end
+    last_weapon_check = now
+
+    weapon_holding = combat_origin.has_weapon() == true
+    if not weapon_holding and input and input.is_key_down and input.is_key_down(SHOOT_VK) then
+        weapon_holding = true
     end
-    if has_weapon then
-        weapon_hold_ticks = 4
-    else
-        weapon_hold_ticks = math.max(0, weapon_hold_ticks - 1)
-    end
-    return weapon_hold_ticks > 0
+    return weapon_holding
 end
 
 local function live_bone_pos(p, bone_name)
@@ -5097,7 +5319,7 @@ local function apply_prediction(pos, p)
     }
 end
 
-local function get_bone_pos(p)
+function M.get_bone_pos(p)
     if not p then
         return nil
     end
@@ -5127,6 +5349,28 @@ local function get_bone_pos(p)
     return apply_prediction(pos, p)
 end
 
+local function vis_filter_enabled()
+    if menu and menu.get then
+        return menu.get("silent_filter_visible") == true
+    end
+    return s.silent_filter_visible == true
+end
+
+local function player_visible(p, aim)
+    if not vis_filter_enabled() then
+        return true
+    end
+    if not p or not aim then
+        return false
+    end
+    local cam = silent_ray.get_camera_origin()
+    if not cam then
+        return false
+    end
+    local muzzle = combat_origin.get_muzzle_origin()
+    return combat_vis.can_see_player(cam.x, cam.y, cam.z, p, aim, true, muzzle)
+end
+
 local function passes_gadget_filters(w)
     if not w or not w.x then
         return false
@@ -5140,7 +5384,7 @@ local function passes_gadget_filters(w)
     if s.silent_gadget_team_check and w.is_teammate_gadget then
         return false
     end
-    if silent_vis_enabled() and w.is_visible ~= true then
+    if vis_filter_enabled() and w.is_visible ~= true then
         return false
     end
     return true
@@ -5161,16 +5405,17 @@ local function passes_filters(p)
     if s.silent_filter_team and p.is_teammate then
         return false
     end
-    if s.silent_filter_health and p.health <= 0 then
-        return false
-    end
-    if s.silent_filter_visible and not p.is_visible then
+    if s.silent_filter_health and not health.passes(s, p) then
         return false
     end
     if p.dist > (s.silent_max_dist or 250) then
         return false
     end
-    return true
+    local aim = M.get_bone_pos(p)
+    if not aim then
+        return false
+    end
+    return player_visible(p, aim)
 end
 
 local function is_valid_player_target(p)
@@ -5179,7 +5424,7 @@ local function is_valid_player_target(p)
     end
     for _, cp in ipairs(cache.players) do
         if cp.viewmodel == p.viewmodel then
-            return cp.health > 0
+            return health.passes(s, cp)
         end
     end
     return false
@@ -5204,7 +5449,7 @@ local function is_valid_target(t)
 end
 
 local function in_fov_player(p, cx, cy, fov)
-    local tb = get_bone_pos(p)
+    local tb = M.get_bone_pos(p)
     if not tb then
         return false
     end
@@ -5216,7 +5461,7 @@ local function in_fov_player(p, cx, cy, fov)
 end
 
 local function score_player(p, cx, cy, fov)
-    local tb = get_bone_pos(p)
+    local tb = M.get_bone_pos(p)
     if not tb then
         return nil
     end
@@ -5283,27 +5528,19 @@ local function refresh_target(cx, cy, fov)
         locked_target = nil
     end
 
-    local now = tick_ms()
-    if now - last_target_scan < TARGET_SCAN_MS then
-        return
-    end
-    last_target_scan = now
-
     local new = find_target(cx, cy, fov)
     if new then
         locked_target = new
         return
     end
 
-    if not s.silent_sticky and locked_target then
-        if is_gadget_target(locked_target) then
-            local w = live_world_entry(locked_target.world_entry)
-            if not w or not score_gadget(w, cx, cy, fov) then
-                locked_target = nil
-            end
-        elseif not in_fov_player(locked_target, cx, cy, fov) then
+    if is_gadget_target(locked_target) then
+        local w = live_world_entry(locked_target.world_entry)
+        if not w or not score_gadget(w, cx, cy, fov) then
             locked_target = nil
         end
+    elseif locked_target and not in_fov_player(locked_target, cx, cy, fov) then
+        locked_target = nil
     end
 end
 
@@ -5322,23 +5559,23 @@ function M.get_aim_point()
     if is_gadget_target(locked_target) then
         return get_gadget_aim(locked_target.world_entry)
     end
-    return get_bone_pos(locked_target)
+    return M.get_bone_pos(locked_target)
 end
 
 function M.update(_dt)
     if not M.active() then
         locked_target = nil
+        cache.aim.silent_target_vm = nil
         silent_ray.stop()
         return
     end
 
     silent_ray.ensure_hook()
+    combat_origin.invalidate()
 
     if not holding_weapon() then
-        if not (input and input.is_key_down and input.is_key_down(0x01)) then
-            silent_ray.stop()
-            return
-        end
+        cache.aim.silent_target_vm = nil
+        return
     end
 
     local cx, cy = cache.screen_w * 0.5, cache.screen_h * 0.5
@@ -5347,23 +5584,27 @@ function M.update(_dt)
     refresh_target(cx, cy, fov)
 
     if not locked_target then
-        silent_ray.stop()
+        cache.aim.silent_target_vm = nil
         return
+    end
+
+    if is_gadget_target(locked_target) then
+        cache.aim.silent_target_vm = nil
+    else
+        cache.aim.silent_target_vm = locked_target.viewmodel
     end
 
     local aim = M.get_aim_point()
     if not aim then
-        silent_ray.stop()
         return
     end
 
-    local origin, resolved_aim = silent_resolve.resolve_track(aim)
+    local origin, resolved_aim, hitpart = silent_resolve.resolve_track(aim, s.silent_bone)
     if not origin or not resolved_aim then
-        silent_ray.stop()
         return
     end
 
-    silent_ray.track(origin, resolved_aim, SHOOT_VK)
+    silent_ray.track(origin, resolved_aim, SHOOT_VK, hitpart or aim, true)
 end
 
 function M.draw()
@@ -5396,6 +5637,958 @@ function M.draw()
             end
         end
     end
+
+    if s.silent_hitscan_vis then
+        hitscan_visuals.draw(silent_resolve.last_info)
+    end
+end
+
+return M
+
+end)()
+
+-- ── game/gc_weapon_mods.lua ──
+June._mods["game.gc_weapon_mods"] = (function()
+-- Operation One GC layer — safe single-key patches (dump: Items.load_instance, Animations_30842).
+-- Weapon stats copy stats → states on equip. Character uses speed_multiplier (Audio_29057).
+
+local debug = June.require("core.debug")
+local env = June.require("core.env")
+
+local M = {}
+
+M.WEAPON_KEYS = {
+    "recoil_up",
+    "recoil_side",
+    "firerate",
+    "damage",
+    "range",
+    "destructive",
+    "speed",
+    "fuel",
+    "prone_recoil",
+}
+
+M.CHARACTER_KEYS = {
+    "speed_multiplier",
+}
+
+M.CLAMP = {
+    recoil_up = {0.01, 5},
+    recoil_side = {0.01, 5},
+    firerate = {60, 400},
+    damage = {1, 120},
+    range = {1, 100},
+    destructive = {0.5, 3},
+    speed = {0.85, 1},
+    fuel = {25, 999},
+    prone_recoil = {0.01, 1},
+    speed_multiplier = {1, 1.4},
+}
+
+M._last_node_count = 0
+M._refreshed = false
+
+local function has_api()
+    return type(refreshgc) == "function"
+        and type(getgc) == "function"
+        and type(applygc) == "function"
+end
+
+local function clamp_key(key, value)
+    local lim = M.CLAMP[key]
+    local n = tonumber(value)
+    if not n or not lim then
+        return nil
+    end
+    if n < lim[1] then
+        n = lim[1]
+    elseif n > lim[2] then
+        n = lim[2]
+    end
+    if key == "firerate" and n <= 0 then
+        n = 60
+    end
+    return n
+end
+
+function M.available()
+    return has_api()
+end
+
+function M.last_node_count()
+    return M._last_node_count
+end
+
+function M.in_game()
+    return env.get_local_player() ~= nil
+end
+
+function M.ensure_refresh()
+    if not has_api() or not M.in_game() then
+        return false
+    end
+    if not M._refreshed then
+        pcall(refreshgc)
+        M._refreshed = true
+    end
+    return true
+end
+
+function M.warm_keys(keys)
+    if not has_api() then
+        return 0
+    end
+    local count = 0
+    local ok, result = pcall(getgc, keys)
+    if ok and type(result) == "number" then
+        count = result
+    end
+    if count > M._last_node_count then
+        M._last_node_count = count
+    end
+    return count
+end
+
+function M.apply_one(key, value)
+    if not has_api() or not M.in_game() then
+        return false, 0
+    end
+    local v = clamp_key(key, value)
+    if v == nil then
+        return false, 0
+    end
+
+    M.ensure_refresh()
+    M.warm_keys({key})
+
+    local patched = 0
+    local ok, result = pcall(applygc, {key}, {[key] = v})
+    if ok and type(result) == "number" then
+        patched = result
+    end
+    if patched > M._last_node_count then
+        M._last_node_count = patched
+    end
+    return patched > 0, patched
+end
+
+function M.apply_many(mods)
+    if not has_api() then
+        return false, 0, "GC API unavailable"
+    end
+    if not M.in_game() then
+        return false, 0, "Enter a match first"
+    end
+    if not mods or not next(mods) then
+        return false, 0, "No modifiers selected"
+    end
+
+    M.ensure_refresh()
+
+    local keys = {}
+    for k in pairs(mods) do
+        keys[#keys + 1] = k
+    end
+    table.sort(keys)
+    M.warm_keys(keys)
+
+    local total = 0
+    local applied = 0
+    for _, key in ipairs(keys) do
+        local ok, n = M.apply_one(key, mods[key])
+        if ok then
+            applied = applied + 1
+            total = total + n
+        end
+    end
+
+    if applied > 0 then
+        return true, total, string.format("%d key(s), %d node(s)", applied, total)
+    end
+
+    debug.warn_once("gun_mods:nodes", "GC warming — equip gun, enable mods, wait")
+    return false, 0, "GC warming — equip gun"
+end
+
+function M.refresh_cache()
+    if not has_api() or not M.in_game() then
+        M._last_node_count = 0
+        M._refreshed = false
+        return 0
+    end
+    pcall(refreshgc)
+    M._refreshed = true
+    local count = M.warm_keys(M.WEAPON_KEYS)
+    M.warm_keys(M.CHARACTER_KEYS)
+    return count
+end
+
+function M.reset_session()
+    M._refreshed = false
+end
+
+function M.status_text()
+    if not has_api() then
+        return "GC: unavailable"
+    end
+    return string.format("GC nodes: %d", M._last_node_count)
+end
+
+return M
+
+end)()
+
+-- ── features/combat/gun_mods.lua ──
+June._mods["features.combat.gun_mods"] = (function()
+local settings = June.require("core.settings")
+local gc = June.require("game.gc_weapon_mods")
+local env = June.require("core.env")
+
+local M = {}
+
+local P = "june_gunmods_enabled"
+local PERSIST_MS = 500
+local RETRY_MS = 1000
+local RETRY_MAX_MS = 30000
+
+M._apply_dirty = false
+M._defer_until = 0
+M._retry_until = 0
+M._last_persist = 0
+M._status = "Off"
+
+local function tick_ms()
+    return utility and utility.get_tick_count and utility.get_tick_count() or 0
+end
+
+local function build_weapon_mods()
+    local mods = {}
+
+    if settings.enabled("june_gm_recoil") then
+        mods.recoil_up = 0.01
+        mods.recoil_side = 0.01
+        mods.prone_recoil = 0.01
+    end
+
+    if settings.enabled("june_gm_firerate") then
+        mods.firerate = settings.num("june_gm_firerate_val", 300)
+    end
+
+    if settings.enabled("june_gm_damage") then
+        mods.damage = settings.num("june_gm_damage_val", 100)
+    end
+
+    if settings.enabled("june_gm_range") then
+        mods.range = settings.num("june_gm_range_val", 80)
+    end
+
+    if settings.enabled("june_gm_destructive") then
+        mods.destructive = settings.num("june_gm_destructive_val", 20) * 0.1
+    end
+
+    if settings.enabled("june_gm_lightweight") then
+        mods.speed = settings.num("june_gm_lightweight_val", 100) * 0.01
+    end
+
+    return mods
+end
+
+local function build_exploit_mods()
+    local mods = {}
+
+    if settings.enabled("june_gc_speed_mult") then
+        mods.speed_multiplier = settings.num("june_gc_speed_mult_val", 115) * 0.01
+    end
+
+    if settings.enabled("june_gc_infinite_ammo") then
+        mods.fuel = 999
+    end
+
+    return mods
+end
+
+local function build_all_mods()
+    local mods = build_weapon_mods()
+    for k, v in pairs(build_exploit_mods()) do
+        mods[k] = v
+    end
+    return mods
+end
+
+local function set_status(text)
+    M._status = text or "—"
+    if menu and menu.set then
+        pcall(menu.set, "june_gm_status", M._status)
+    end
+end
+
+local function schedule_apply(delay_ms)
+    M._apply_dirty = true
+    local now = tick_ms()
+    local until_ms = now + (delay_ms or 400)
+    if until_ms > M._defer_until then
+        M._defer_until = until_ms
+    end
+    if M._retry_until <= now then
+        M._retry_until = now + RETRY_MAX_MS
+    end
+end
+
+function M.reset_mods()
+    gc.reset_session()
+    set_status("Off — re-equip to reset stats")
+end
+
+function M.try_apply(silent)
+    if not settings.enabled(P) then
+        return false
+    end
+    if not env.get_local_player() then
+        set_status("Join match")
+        return false
+    end
+
+    local mods = build_all_mods()
+    if not next(mods) then
+        M.reset_mods()
+        M._apply_dirty = false
+        set_status("No mods selected")
+        return false
+    end
+
+    local ok, count, msg = gc.apply_many(mods)
+    if ok then
+        M._apply_dirty = false
+        M._retry_until = 0
+        set_status(msg or (tostring(count) .. " nodes"))
+        if not silent then
+            print("[June] Gun mods: " .. tostring(msg))
+        end
+        return true
+    end
+
+    M._apply_dirty = true
+    M._defer_until = tick_ms() + RETRY_MS
+    set_status(msg or "Warming…")
+    return false
+end
+
+function M.update(_dt)
+    if not settings.enabled(P) then
+        return
+    end
+
+    local now = tick_ms()
+
+    if M._apply_dirty then
+        if now >= M._defer_until then
+            if M._retry_until > 0 and now > M._retry_until then
+                M._apply_dirty = false
+                set_status("Failed — re-equip gun")
+                return
+            end
+            M.try_apply(true)
+        end
+    end
+
+    if now - M._last_persist >= PERSIST_MS then
+        M._last_persist = now
+        local mods = build_all_mods()
+        if next(mods) then
+            gc.apply_many(mods)
+        end
+    end
+end
+
+function M.on_setting_changed()
+    if settings.enabled(P) then
+        gc.reset_session()
+        schedule_apply(300)
+    else
+        M.reset_mods()
+        M._apply_dirty = false
+        set_status("Off")
+    end
+end
+
+function M.init()
+    if not gc.available() then
+        set_status("GC unavailable")
+        return
+    end
+    gc.refresh_cache()
+    set_status(gc.status_text())
+
+    local ids = {
+        P,
+        "june_gm_recoil",
+        "june_gm_firerate", "june_gm_firerate_val",
+        "june_gm_damage", "june_gm_damage_val",
+        "june_gm_range", "june_gm_range_val",
+        "june_gm_destructive", "june_gm_destructive_val",
+        "june_gm_lightweight", "june_gm_lightweight_val",
+        "june_gc_speed_mult", "june_gc_speed_mult_val",
+        "june_gc_infinite_ammo",
+    }
+    for _, id in ipairs(ids) do
+        settings.on_change(id, M.on_setting_changed)
+    end
+
+    if settings.enabled(P) then
+        schedule_apply(500)
+    end
+end
+
+return M
+
+end)()
+
+-- ── core/movement_bypass.lua ──
+June._mods["core.movement_bypass"] = (function()
+local M = {}
+
+local cache = {}
+local ready = false
+local old_phys, old_send = nil, nil
+local last_apply_t = 0
+
+local FLAG_DEFAULTS = {
+    PhysicsSenderMaxBandwidthBps = 38760,
+    DataSenderRate = 60,
+    S2PhysicsSenderRate = 15,
+}
+
+local function can_mem()
+    return memory and type(memory.write) == "function"
+end
+
+local function can_fflag()
+    return fflag and type(fflag.set_value) == "function"
+end
+
+function M.available()
+    return can_mem() or can_fflag()
+end
+
+function M.refresh()
+    cache = {}
+    ready = false
+    if not fflag or not fflag.is_scanned or not fflag.is_scanned() then return end
+    local ok, all = pcall(fflag.get_all)
+    if ok and type(all) == "table" then
+        for i = 1, #all do
+            local e = all[i]
+            if e and e.name and e.address and e.address > 0 then
+                cache[e.name] = { addr = e.address, original = e.original or e.value }
+            end
+        end
+    end
+    ready = next(cache) ~= nil
+end
+
+local function lookup(name)
+    if cache[name] then return cache[name] end
+    if not fflag or not fflag.find then return nil end
+    local ok, hits = pcall(fflag.find, name)
+    if ok and type(hits) == "table" and hits[1] and hits[1].address then
+        local e = { addr = hits[1].address, original = hits[1].original or hits[1].value }
+        cache[name] = e
+        return e
+    end
+    return nil
+end
+
+function M.set_int(name, value)
+    if not name then return false end
+    if not ready then M.refresh() end
+    local num = tonumber(value)
+    if num == nil then return false end
+
+    local e = lookup(name)
+    if e and e.addr and can_mem() then
+        local ok = pcall(memory.write, e.addr, "int32", num)
+        if ok then return true end
+    end
+    if can_fflag() then
+        return pcall(fflag.set_value, name, num) == true
+    end
+    return false
+end
+
+function M.apply_rates(physics_rate, sender_rate)
+    local phys = tonumber(physics_rate) or 0
+    local send = tonumber(sender_rate) or 60
+    local bw = phys == 0 and 0 or 38760
+
+    M.set_int("S2PhysicsSenderRate", phys)
+    M.set_int("PhysicsSenderMaxBandwidthBps", bw)
+    M.set_int("DataSenderRate", send)
+    old_phys, old_send = phys, send
+end
+
+function M.reset_defaults()
+    for name, val in pairs(FLAG_DEFAULTS) do
+        M.set_int(name, val)
+    end
+    old_phys, old_send = nil, nil
+    last_apply_t = 0
+end
+
+local function now()
+    if utility and utility.get_time then return utility.get_time() end
+    return os.clock()
+end
+
+-- Autosend pulse: choke physics for `window` seconds, then brief send burst.
+function M.tick_movement(active, autosend_window)
+    if not M.available() then return end
+    if not active then
+        if old_phys ~= nil or old_send ~= nil then
+            M.reset_defaults()
+        end
+        return
+    end
+
+    local t = now()
+    local window = tonumber(autosend_window) or 0.1
+    if window < 0.05 then window = 0.05 end
+    if window > 1 then window = 1 end
+
+    local cycle = window + 0.1
+    local phys, send = 0, 60
+    if (t % cycle) > window then
+        phys, send = 15, 60
+    end
+
+    if phys ~= old_phys or send ~= old_send or (t - last_apply_t) > 0.35 then
+        M.apply_rates(phys, send)
+        last_apply_t = t
+    end
+end
+
+return M
+
+end)()
+
+-- ── core/cframe_move.lua ──
+June._mods["core.cframe_move"] = (function()
+-- Soft movement helpers. HRP velocity only — no WalkSpeed writes (AC-safe).
+
+local env = June.require("core.env")
+
+local M = {}
+
+local BASE_PARTS = {
+    Part = true, MeshPart = true, UnionOperation = true,
+    WedgePart = true, CornerWedgePart = true, TrussPart = true,
+}
+
+local NOCLIP_PARTS = {
+    "HumanoidRootPart", "Torso", "UpperTorso", "LowerTorso", "Head",
+}
+
+local DEFAULT_GRAVITY = 196.2
+
+function M.delta_time()
+    if utility and utility.get_delta_time then
+        local dt = utility.get_delta_time()
+        if dt and dt > 0 and dt <= 0.1 then return dt end
+    end
+    return 0.016
+end
+
+function M.key_down(code)
+    return input and input.is_key_down and input.is_key_down(code)
+end
+
+function M.read_velocity(inst)
+    if not inst then return 0, 0, 0 end
+    local vel = inst.AssemblyLinearVelocity or inst.Velocity or inst.velocity
+    if not vel then return 0, 0, 0 end
+    return vel.X or vel.x or 0, vel.Y or vel.y or 0, vel.Z or vel.z or 0
+end
+
+function M.is_base_part(inst)
+    if not inst then return false end
+    if inst.is_a then
+        local ok, yes = pcall(function() return inst:is_a("BasePart") end)
+        if ok and yes then return true end
+    end
+    local cn = inst.ClassName or inst.class_name
+    return BASE_PARTS[cn] == true
+end
+
+function M.find_part(char, name)
+    if not char then return nil end
+    return env.safe_call(function()
+        if char.find_first_child then return char:find_first_child(name) end
+        return char:FindFirstChild(name)
+    end)
+end
+
+function M.iter_parts(char)
+    local out = {}
+    if not char then return out end
+
+    local desc = env.safe_call(function() return char:get_descendants() end)
+        or env.safe_call(function() return char:GetDescendants() end)
+    if desc then
+        for _, inst in ipairs(desc) do
+            if M.is_base_part(inst) then
+                out[#out + 1] = inst
+            end
+        end
+    end
+
+    return out
+end
+
+function M.set_character_noclip(char, _root, enabled)
+    local collide = not enabled
+    for _, inst in ipairs(M.iter_parts(char)) do
+        M.set_part_collide(inst, collide)
+    end
+end
+
+function M.set_velocity(inst, x, y, z)
+    if not inst then return end
+    if part and part.set_velocity then
+        pcall(part.set_velocity, inst, x, y, z)
+    else
+        pcall(function()
+            if inst.set_velocity then
+                inst:set_velocity(x, y, z)
+            else
+                inst.Velocity = Vector3.new(x, y, z)
+            end
+        end)
+    end
+end
+
+function M.set_angular_velocity(inst, x, y, z)
+    if not inst then return end
+    x, y, z = x or 0, y or 0, z or 0
+    if part and part.set_angular_velocity then
+        pcall(part.set_angular_velocity, inst, x, y, z)
+    else
+        pcall(function()
+            if inst.set_angular_velocity then
+                inst:set_angular_velocity(x, y, z)
+            else
+                inst.AngularVelocity = Vector3.new(x, y, z)
+            end
+        end)
+    end
+end
+
+function M.set_part_collide(inst, collide)
+    if not inst then return end
+    if part and part.set_can_collide then
+        pcall(part.set_can_collide, inst, collide)
+    else
+        pcall(function() inst.CanCollide = collide end)
+    end
+end
+
+function M.humanoid_state(hum, state)
+    if not hum or state == nil then return end
+    pcall(function()
+        if hum.set_state then hum:set_state(state)
+        else hum.state = state
+        end
+    end)
+end
+
+function M.camera_flat_axes()
+    if not camera or not camera.get_look_vector then return nil end
+    local ok, look = pcall(camera.get_look_vector)
+    if not ok or not look then return nil end
+
+    local lx = look.x or look.X or 0
+    local lz = look.z or look.Z or 0
+    local lm = math.sqrt(lx * lx + lz * lz)
+    if lm < 0.001 then return nil end
+    lx, lz = lx / lm, lz / lm
+
+    return lx, lz, -lz, lx
+end
+
+function M.read_flat_input()
+    local lx, lz, rx, rz = M.camera_flat_axes()
+    if not lx then return 0, 0 end
+
+    local mx, mz = 0, 0
+    if M.key_down(0x57) then mx, mz = mx + lx, mz + lz end
+    if M.key_down(0x53) then mx, mz = mx - lx, mz - lz end
+    if M.key_down(0x41) then mx, mz = mx - rx, mz - rz end
+    if M.key_down(0x44) then mx, mz = mx + rx, mz + rz end
+
+    local mag = math.sqrt(mx * mx + mz * mz)
+    if mag < 0.001 then return 0, 0 end
+    return mx / mag, mz / mag
+end
+
+function M.read_fly_input()
+    local mx, mz = M.read_flat_input()
+    local my = 0
+    if M.key_down(0x20) then my = 1 end
+    if M.key_down(0x11) then my = -1 end
+    return mx, my, mz
+end
+
+function M.drive_root_velocity(root, dx, dy, dz, speed, dt, opts)
+    if not root then return end
+    opts = opts or {}
+    dt = dt or M.delta_time()
+
+    local mag = math.sqrt(dx * dx + dy * dy + dz * dz)
+    local tx, ty, tz = 0, 0, 0
+    if mag >= 0.001 then
+        dx, dy, dz = dx / mag, dy / mag, dz / mag
+        tx, ty, tz = dx * speed, dy * speed, dz * speed
+    end
+
+    if opts.cancel_gravity ~= false and math.abs(ty) < 0.01 then
+        ty = 0
+    end
+
+    local cx, cy, cz = M.read_velocity(root)
+    local blend = opts.blend or 0.35
+    blend = math.max(0.05, math.min(1, blend))
+
+    local nx = cx + (tx - cx) * blend
+    local ny = cy + (ty - cy) * blend
+    local nz = cz + (tz - cz) * blend
+
+    local max_speed = opts.max_speed or (speed * 1.15)
+    local sm = math.sqrt(nx * nx + ny * ny + nz * nz)
+    if sm > max_speed and sm > 0.001 then
+        local s = max_speed / sm
+        nx, ny, nz = nx * s, ny * s, nz * s
+    end
+
+    M.set_velocity(root, nx, ny, nz)
+    M.set_angular_velocity(root, 0, 0, 0)
+end
+
+function M.boost_ground_velocity(root, mult, dt)
+    if not root or not mult or mult <= 1.001 then return end
+    local mx, mz = M.read_flat_input()
+    if mx == 0 and mz == 0 then return end
+
+    local cx, cy, cz = M.read_velocity(root)
+    local horiz = math.sqrt(cx * cx + cz * cz)
+    if horiz < 0.5 then return end
+
+    local boost = (mult - 1) * horiz * math.min(1, (dt or M.delta_time()) * 12)
+    M.set_velocity(root, cx + mx * boost, cy, cz + mz * boost)
+end
+
+return M
+
+end)()
+
+-- ── core/movement_ctrl.lua ──
+June._mods["core.movement_ctrl"] = (function()
+-- Fly / slowfall / speed boost — HRP velocity + physics desync bypass.
+
+local settings = June.require("core.settings")
+local env = June.require("core.env")
+local move = June.require("core.cframe_move")
+local bypass = June.require("core.movement_bypass")
+
+local M = {}
+
+local P_FLY = "june_fly_enabled"
+local P_FLY_SPEED = "june_fly_speed"
+local P_FLY_NOCLIP = "june_fly_noclip"
+local P_SLOWFALL = "june_slowfall_enabled"
+local P_SPEED_BOOST = "june_speed_boost_enabled"
+local P_SPEED_MULT = "june_speed_boost_mult"
+local P_DESYNC = "june_move_desync"
+
+local tracked_char_id = nil
+local last_ground_ms = 0
+local bypass_active = false
+
+local SPEED_SCALE = 12
+local MAX_FLY_SPEED = 48
+local VEL_BLEND = 0.22
+local GROUND_STATE_MS = 50
+
+local function tick_ms()
+    return utility and utility.get_tick_count and utility.get_tick_count() or 0
+end
+
+local function char_id(char)
+    if not char then return nil end
+    return char.Address or char.address or tostring(char)
+end
+
+local function get_character(lp)
+    if lp and lp.character then return lp.character end
+    if game and game.local_player and game.local_player.character then
+        return game.local_player.character
+    end
+    return nil
+end
+
+local function get_root(lp)
+    local char = get_character(lp)
+    if not char then return nil end
+    return move.find_part(char, "HumanoidRootPart")
+end
+
+local function get_humanoid(lp)
+    if lp and lp.humanoid and env.is_valid(lp.humanoid) then
+        return lp.humanoid
+    end
+    local char = get_character(lp)
+    if not char then return nil end
+    return env.safe_call(function()
+        if char.find_first_child_of_class then return char:find_first_child_of_class("Humanoid") end
+        return char:FindFirstChildOfClass("Humanoid")
+    end)
+end
+
+local function hum_alive(hum)
+    if not hum then return false end
+    local hp = hum.Health or hum.health
+    if hp == nil then return true end
+    return hp > 0
+end
+
+local function fly_speed()
+    local raw = settings.num(P_FLY_SPEED, 3)
+    raw = math.max(2, math.min(4, raw))
+    local spd = raw * SPEED_SCALE
+    if spd > MAX_FLY_SPEED then spd = MAX_FLY_SPEED end
+    return spd
+end
+
+local function speed_boost_mult()
+    local raw = settings.num(P_SPEED_MULT, 12)
+    return 1 + (math.max(0, math.min(30, raw)) / 100)
+end
+
+local function movement_active()
+    return settings.enabled(P_FLY)
+        or settings.enabled(P_SLOWFALL)
+        or settings.enabled(P_SPEED_BOOST)
+end
+
+local function want_desync()
+    if settings.enabled(P_DESYNC) then return true end
+    return movement_active()
+end
+
+local function sync_bypass(on)
+    if not bypass.available() then return end
+    if on then
+        bypass.tick_movement(true, 0.1)
+        bypass_active = true
+    elseif bypass_active then
+        bypass.tick_movement(false)
+        bypass_active = false
+    end
+end
+
+local function keep_grounded_for_shoot(hum)
+    if not hum or not hum_alive(hum) then return end
+    local now = tick_ms()
+    if now - last_ground_ms < GROUND_STATE_MS then return end
+    last_ground_ms = now
+
+    pcall(function() hum.Jump = false end)
+    pcall(function()
+        if hum.ChangeState then hum:ChangeState(8)
+        elseif hum.change_state then hum:change_state(8)
+        else move.humanoid_state(hum, 8)
+        end
+    end)
+end
+
+local function tick_fly(root, hum, char, dt)
+    if not hum_alive(hum) then return end
+    if settings.enabled(P_FLY_NOCLIP) then
+        move.set_character_noclip(char, root, true)
+    end
+
+    local mx, my, mz = move.read_fly_input()
+    move.drive_root_velocity(root, mx, my, mz, fly_speed(), dt, {
+        blend = VEL_BLEND,
+        max_speed = fly_speed() * 1.05,
+        cancel_gravity = true,
+    })
+    keep_grounded_for_shoot(hum)
+end
+
+local function tick_slowfall(root, hum, dt)
+    local raw = settings.num("june_slowfall_speed", 5)
+    local cap = -(1.2 + (math.max(1, raw) * 0.22))
+    local vx, vy, vz = move.read_velocity(root)
+    if vy < cap then
+        local next_y = vy + (cap - vy) * math.min(1, dt * 8)
+        move.set_velocity(root, vx, next_y, vz)
+    end
+    keep_grounded_for_shoot(hum)
+end
+
+local function tick_speed_boost(root, dt)
+    if settings.enabled(P_FLY) then return end
+    move.boost_ground_velocity(root, speed_boost_mult(), dt)
+end
+
+function M.tick(dt)
+    dt = dt or move.delta_time()
+
+    local active = movement_active()
+    if want_desync() and (active or settings.enabled(P_DESYNC)) then
+        sync_bypass(true)
+    else
+        sync_bypass(false)
+    end
+
+    if not active then return end
+
+    local lp = env.get_local_player()
+    if not lp then return end
+
+    local char = get_character(lp)
+    if not char or not env.is_valid(char) then return end
+
+    local root = get_root(lp)
+    local hum = get_humanoid(lp)
+    if not root or not hum then return end
+
+    if char_id(char) ~= tracked_char_id then
+        tracked_char_id = char_id(char)
+        last_ground_ms = 0
+    end
+
+    if settings.enabled(P_FLY) then
+        tick_fly(root, hum, char, dt)
+    else
+        if settings.enabled(P_FLY_NOCLIP) then
+            move.set_character_noclip(char, root, false)
+        end
+        if settings.enabled(P_SLOWFALL) then
+            tick_slowfall(root, hum, dt)
+        end
+        if settings.enabled(P_SPEED_BOOST) then
+            tick_speed_boost(root, dt)
+        end
+    end
+end
+
+function M.install()
+    bypass.refresh()
+end
+
+function M.shutdown()
+    bypass.tick_movement(false)
+    bypass_active = false
 end
 
 return M
@@ -5455,12 +6648,13 @@ local function render_players()
     local tracer_origin = s.tracer_origin or TRACER_ORIGIN.BOTTOM
     local tracer_style = s.tracer_style or TRACER_STYLE.SOLID
     local vis_override = s.players_visible_override
-    local vis_col = s.players_visible_override_color
+    local vis_col = s.players_visible_override_color or {0, 1, 0.3, 1}
     local tgt_override = s.players_target_override
-    local tgt_col = s.players_target_override_color
+    local tgt_col = s.players_target_override_color or {1, 0.2, 0.2, 1}
     local aim_target_vm = cache.aim.current_target and cache.aim.current_target.target and
         (not cache.aim.current_target.target.is_utility) and
         cache.aim.current_target.target.viewmodel or nil
+    local silent_target_vm = cache.aim.silent_target_vm
 
     for _, p in ipairs(cache.players) do
         if not p.is_teammate or s.players_team then
@@ -5474,7 +6668,11 @@ local function render_players()
             end
 
             local eff_col = esp_col
-            if tgt_override and aim_target_vm and p.viewmodel == aim_target_vm then
+            local is_target = tgt_override and p.viewmodel and (
+                (aim_target_vm and p.viewmodel == aim_target_vm)
+                or (silent_target_vm and p.viewmodel == silent_target_vm)
+            )
+            if is_target then
                 eff_col = tgt_col
             elseif vis_override and p.is_visible then
                 eff_col = vis_col
@@ -5499,7 +6697,7 @@ local function render_players()
             local c_view = eff_col
             local c_trac = eff_col
 
-            if not (tgt_override or (vis_override and p.is_visible)) then
+            if not is_target and not (vis_override and p.is_visible) then
                 c_name = name_col
                 c_wpn = wpn_col
                 c_dist = dist_col
@@ -5601,11 +6799,19 @@ local world_scan = June.require("game.world_scan")
 
 local floor = June.require("core.constants").floor
 local DIST = June.require("core.constants").DIST
+local bbox_center = draw_util.bbox_center
 
 local M = {}
 local s = settings.s
 local draw_3d_box = draw_util.draw_3d_box
 local dist3d_sq = draw_util.dist3d_sq
+
+local TEXT_W_CACHE = {}
+local TEXT_W_CACHE_MAX = 256
+
+local function tick_ms()
+    return utility and utility.get_tick_count and utility.get_tick_count() or 0
+end
 
 local function world_to_screen(x, y, z)
     if utility and utility.world_to_screen then
@@ -5617,6 +6823,51 @@ local function world_to_screen(x, y, z)
     return 0, 0, false
 end
 
+local function text_width(txt, fs)
+    local key = txt .. "\0" .. tostring(fs)
+    local cached = TEXT_W_CACHE[key]
+    if cached then
+        return cached
+    end
+    cached = draw.get_text_size(txt, fs)
+    if cached then
+        local n = 0
+        for _ in pairs(TEXT_W_CACHE) do n = n + 1 end
+        if n >= TEXT_W_CACHE_MAX then
+            TEXT_W_CACHE = {}
+        end
+        TEXT_W_CACHE[key] = cached
+    end
+    return cached or (#txt * fs * 0.55)
+end
+
+local function label_anchor(w)
+    if w.bbox then
+        local c = bbox_center(w.bbox)
+        if c then
+            return c.x, c.y, c.z
+        end
+    end
+    return w.x, w.y, w.z
+end
+
+local function build_label_text(w, show_text, show_dist)
+    local dist_i = floor(w.dist or 0)
+    if w._esp_dist_i == dist_i and w._esp_label_text then
+        return w._esp_label_text
+    end
+    local txt = ""
+    if show_text and w.label then
+        txt = w.label
+    end
+    if show_dist then
+        txt = txt .. (show_text and " [" or "[") .. dist_i .. "m]"
+    end
+    w._esp_dist_i = dist_i
+    w._esp_label_text = txt
+    return txt
+end
+
 function M.render_world()
     if not s.world_enabled then
         return
@@ -5626,12 +6877,17 @@ function M.render_world()
     local show_text = display_opts[1]
     local show_dist = display_opts[2]
     local show_box = display_opts[3]
-    local fs_world = s.font_size_world
+    if not show_text and not show_dist and not show_box then
+        return
+    end
+
+    local fs_world = s.font_size_world or 14
     local max_sq = (s.world_max_distance or 250) * (s.world_max_distance or 250)
     local cam_x, cam_y, cam_z = cache.cam_x, cache.cam_y, cache.cam_z
     local drawn = {}
 
-    for _, w in ipairs(cache.world) do
+    for i = 1, #cache.world do
+        local w = cache.world[i]
         if not w.is_esp or not w.color or not w.x then
             goto continue
         end
@@ -5652,36 +6908,35 @@ function M.render_world()
             drawn[key] = true
         end
 
-        if w.x then
-            local dsq = w.dsq
-            if not dsq then
-                dsq = dist3d_sq(w.x, w.y, w.z, cam_x, cam_y, cam_z)
-                w.dsq = dsq
-                w.dist = math.sqrt(dsq)
-            end
-            if dsq > max_sq then
-                goto continue
-            end
-            if not w.dynamic and dsq <= DIST.ESP_HIDE_SQ then
-                goto continue
-            end
+        local dsq = w.dsq
+        if not dsq then
+            dsq = dist3d_sq(w.x, w.y, w.z, cam_x, cam_y, cam_z)
+            w.dsq = dsq
+        end
+        w.dist = math.sqrt(dsq)
+        if dsq > max_sq then
+            goto continue
+        end
+        if not w.dynamic and dsq <= DIST.ESP_HIDE_SQ then
+            goto continue
         end
 
         if show_box then
-            local bbox = w.bbox
-            if bbox then
-                draw_3d_box(bbox, w.color)
+            if not w.bbox and w.obj then
+                world_scan.refresh_entry_position(w, cam_x, cam_y, cam_z, math.sqrt)
+            end
+            if w.bbox then
+                draw_3d_box(w.bbox, w.color)
             end
         end
 
         if show_text or show_dist then
-            local sx, sy, v = world_to_screen(w.x, w.y, w.z)
+            local lx, ly, lz = label_anchor(w)
+            local sx, sy, v = world_to_screen(lx, ly, lz)
             if v then
-                local txt =
-                    (show_text and w.label or "") ..
-                    (show_dist and (show_text and " [" or "[") .. floor(w.dist) .. "m]" or "")
+                local txt = build_label_text(w, show_text, show_dist)
                 if txt ~= "" then
-                    local tw = draw.get_text_size(txt, fs_world)
+                    local tw = text_width(txt, fs_world)
                     draw.text(sx - tw * 0.5, sy - fs_world - 2, txt, w.color, fs_world)
                 end
             end
@@ -5689,295 +6944,6 @@ function M.render_world()
 
         ::continue::
     end
-end
-
-return M
-
-end)()
-
--- ── features/visuals/engine_chams.lua ──
-June._mods["features.visuals.engine_chams"] = (function()
-local settings = June.require("core.settings")
-local cache = June.require("core.cache")
-local env = June.require("core.env")
-local gpu_chams = June.require("core.gpu_chams")
-local world_items = June.require("game.world_items")
-
-local M = {}
-
-local PLAYER_CHAMS = "players_engine_chams"
-local PLAYER_MODE = "players_engine_chams_mode"
-local PLAYER_COLOR = "players_engine_chams_color"
-local PLAYER_RANGE = "players_engine_chams_range"
-local PLAYER_TEAM = "players_engine_chams_team_check"
-local PLAYER_VIS = "players_engine_chams_vischeck"
-
-local WORLD_CHAMS = "world_engine_chams"
-local WORLD_MODE = "world_engine_chams_mode"
-local WORLD_COLOR = "world_engine_chams_color"
-local WORLD_RANGE = "world_engine_chams_range"
-
-local PLAYER_PARTS = {
-    {label = "Head", bones = {"head"}},
-    {label = "Torso", bones = {"torso"}},
-    {label = "Left Arm", bones = {"arm1"}},
-    {label = "Right Arm", bones = {"arm2"}},
-    {label = "Left Leg", bones = {"leg1"}},
-    {label = "Right Leg", bones = {"leg2"}},
-    {label = "Left Shoulder", bones = {"shoulder1"}},
-    {label = "Right Shoulder", bones = {"shoulder2"}},
-    {label = "Left Hip", bones = {"hip1"}},
-    {label = "Right Hip", bones = {"hip2"}},
-}
-
-local WORLD_CHAMS_ITEMS = {}
-do
-    for _, item in ipairs(world_items.world_items) do
-        WORLD_CHAMS_ITEMS[#WORLD_CHAMS_ITEMS + 1] = {
-            label = item.name,
-            enabled = item.enabled,
-            match_label = item.label,
-            item = item,
-        }
-    end
-    for _, item in ipairs(world_items.camera_items) do
-        WORLD_CHAMS_ITEMS[#WORLD_CHAMS_ITEMS + 1] = {
-            label = "Map Cam",
-            enabled = item.enabled,
-            match_label = item.label,
-            item = item,
-            map_cam = true,
-        }
-    end
-end
-
-local _wired = false
-
-local function players_active()
-    if not gpu_chams.available() then
-        return false
-    end
-    if not settings.enabled("players_enabled") then
-        return false
-    end
-    return gpu_chams.multicombo_any(PLAYER_CHAMS, #PLAYER_PARTS)
-end
-
-local function world_active()
-    if not gpu_chams.available() then
-        return false
-    end
-    if not settings.enabled("world_enabled") then
-        return false
-    end
-    return gpu_chams.multicombo_any(WORLD_CHAMS, #WORLD_CHAMS_ITEMS)
-end
-
-local function selected_player_bones()
-    local bones = {}
-    for i, part in ipairs(PLAYER_PARTS) do
-        if gpu_chams.multicombo_selected(PLAYER_CHAMS, i) then
-            for _, b in ipairs(part.bones) do
-                bones[#bones + 1] = b
-            end
-        end
-    end
-    return bones
-end
-
-local function collect_player_chams(applied)
-    local cam_x, cam_y, cam_z = cache.cam_x, cache.cam_y, cache.cam_z
-    if not cam_x then
-        return
-    end
-
-    local range = settings.num(PLAYER_RANGE, 250)
-    local range_sq = range * range
-    local team_check = settings.enabled(PLAYER_TEAM)
-    local vis_check = settings.enabled(PLAYER_VIS)
-    local bones = selected_player_bones()
-    if #bones == 0 then
-        return
-    end
-
-    for _, p in ipairs(cache.players) do
-        if not p or not p.viewmodel or not env.is_valid(p.viewmodel) then
-            goto continue
-        end
-        if not p.health or p.health <= 0 then
-            goto continue
-        end
-        if team_check and p.is_teammate then
-            goto continue
-        end
-        if vis_check and not p.is_visible then
-            goto continue
-        end
-
-        local dist = p.dist
-        if not dist and p.head_pos then
-            local dx = p.head_pos.x - cam_x
-            local dy = p.head_pos.y - cam_y
-            local dz = p.head_pos.z - cam_z
-            dist = math.sqrt(dx * dx + dy * dy + dz * dz)
-        end
-        if dist and (dist * dist) > range_sq then
-            goto continue
-        end
-
-        local vm = p.viewmodel
-        for i = 1, #bones do
-            local part = env.safe_call(function()
-                return vm:FindFirstChild(bones[i])
-            end)
-            if part then
-                gpu_chams.cham_part(part, applied)
-            end
-        end
-        ::continue::
-    end
-end
-
-local function world_index_for_entry(w)
-    if not w then
-        return nil
-    end
-    for i, meta in ipairs(WORLD_CHAMS_ITEMS) do
-        if w.item and meta.item and w.item.enabled == meta.enabled then
-            return i
-        end
-        if meta.map_cam and w.map_only then
-            return i
-        end
-        if meta.match_label and w.label and w.label:find(meta.match_label, 1, true) then
-            return i
-        end
-    end
-    return nil
-end
-
-local function collect_world_chams(applied)
-    local cam_x, cam_y, cam_z = cache.cam_x, cache.cam_y, cache.cam_z
-    if not cam_x then
-        return
-    end
-
-    local range = settings.num(WORLD_RANGE, 250)
-    local range_sq = range * range
-    local team_check = settings.enabled("world_team_check")
-
-    for _, w in ipairs(cache.world) do
-        if not w or not w.obj or not env.is_valid(w.obj) then
-            goto continue
-        end
-        if w.is_broken then
-            goto continue
-        end
-        if team_check and w.is_teammate_gadget then
-            goto continue
-        end
-
-        local idx = world_index_for_entry(w)
-        if not idx or not gpu_chams.multicombo_selected(WORLD_CHAMS, idx) then
-            goto continue
-        end
-
-        local dsq = w.dsq
-        if not dsq and w.x then
-            local dx = w.x - cam_x
-            local dy = w.y - cam_y
-            local dz = w.z - cam_z
-            dsq = dx * dx + dy * dy + dz * dz
-        end
-        if dsq and dsq > range_sq then
-            goto continue
-        end
-
-        gpu_chams.cham_entry_part(w, applied)
-        ::continue::
-    end
-end
-
-local function force_sync(owner_id, active_fn)
-    if active_fn() then
-        gpu_chams.sync_owner(owner_id, true)
-    else
-        gpu_chams.clear_owner(owner_id)
-    end
-end
-
-local function wire_owner_callbacks(owner_id, active_fn, multicombo_id, mode_id, color_id, extra_ids)
-    settings.on_change(multicombo_id, function()
-        force_sync(owner_id, active_fn)
-    end)
-    for _, id in ipairs(extra_ids or {}) do
-        settings.on_change(id, function()
-            force_sync(owner_id, active_fn)
-        end)
-    end
-    gpu_chams.wire_style_controls(owner_id, mode_id, color_id)
-end
-
-function M.register()
-    if _wired then
-        return
-    end
-    _wired = true
-
-    gpu_chams.register_owner("players", {
-        rescan_ms = 450,
-        is_active = players_active,
-        style = function()
-            return gpu_chams.mode_index(PLAYER_MODE, 0), gpu_chams.color_index(PLAYER_COLOR, 0)
-        end,
-        collect = collect_player_chams,
-    })
-
-    gpu_chams.register_owner("world", {
-        rescan_ms = 450,
-        is_active = world_active,
-        style = function()
-            return gpu_chams.mode_index(WORLD_MODE, 0), gpu_chams.color_index(WORLD_COLOR, 0)
-        end,
-        collect = collect_world_chams,
-    })
-
-    wire_owner_callbacks("players", players_active, PLAYER_CHAMS, PLAYER_MODE, PLAYER_COLOR, {
-        "players_enabled",
-        PLAYER_RANGE,
-        PLAYER_TEAM,
-        PLAYER_VIS,
-    })
-    wire_owner_callbacks("world", world_active, WORLD_CHAMS, WORLD_MODE, WORLD_COLOR, {
-        "world_enabled",
-        "world_team_check",
-        WORLD_RANGE,
-    })
-end
-
-function M.update()
-    if not _wired then
-        M.register()
-    end
-    -- One coalesced sync — never sync owners separately (causes color flash).
-    gpu_chams.sync_all(false)
-end
-
-function M.update_visibility(s)
-    local players_on = s.players_enabled == true
-    local world_on = s.world_enabled == true
-
-    menu.set_visible(PLAYER_CHAMS, players_on)
-    menu.set_visible(PLAYER_MODE, players_on)
-    menu.set_visible(PLAYER_COLOR, players_on and gpu_chams.color_visible_for_mode(gpu_chams.mode_index(PLAYER_MODE, 0)))
-    menu.set_visible(PLAYER_RANGE, players_on)
-    menu.set_visible(PLAYER_TEAM, players_on)
-    menu.set_visible(PLAYER_VIS, players_on)
-
-    menu.set_visible(WORLD_CHAMS, world_on)
-    menu.set_visible(WORLD_MODE, world_on)
-    menu.set_visible(WORLD_COLOR, world_on and gpu_chams.color_visible_for_mode(gpu_chams.mode_index(WORLD_MODE, 0)))
-    menu.set_visible(WORLD_RANGE, world_on)
 end
 
 return M
@@ -6156,6 +7122,40 @@ return M
 
 end)()
 
+-- ── features/utility/fov_changer.lua ──
+June._mods["features.utility.fov_changer"] = (function()
+local settings = June.require("core.settings")
+
+local M = {}
+local s = settings.s
+
+function M.process_fov_changer()
+    if not s.fov_changer_enabled then
+        return
+    end
+    if not camera or not camera.get_fov or not camera.set_fov then
+        return
+    end
+
+    local target = tonumber(s.fov_changer_value) or 90
+    if target > 90 then target = 90 end
+    if target < 60 then target = 60 end
+    local cur_fov = camera.get_fov()
+    if not cur_fov then
+        return
+    end
+
+    if math.abs(cur_fov - target) > 0.1 then
+        camera.set_fov(target)
+    end
+end
+
+M.process_fov_changer = M.process_fov_changer
+
+return M
+
+end)()
+
 -- ── menu/tabs.lua ──
 June._mods["menu.tabs"] = (function()
 local menu_defs = June.require("menu.menu_defs")
@@ -6168,25 +7168,30 @@ local aimbot = June.require("features.combat.aimbot")
 local silent_aim = June.require("features.combat.silent_aim")
 local player_esp = June.require("features.visuals.player_esp")
 local world_esp = June.require("features.visuals.world_esp")
-local engine_chams = June.require("features.visuals.engine_chams")
 local aimbot_visuals = June.require("features.visuals.aimbot_visuals")
 local crosshair = June.require("features.visuals.crosshair")
 local keybind_window = June.require("features.utility.keybind_window")
+local fov_changer = June.require("features.utility.fov_changer")
+local gun_mods = June.require("features.combat.gun_mods")
+local movement_ctrl = June.require("core.movement_ctrl")
 
 local M = {}
+local movement_ready = false
 M._menu_registered = false
 
 function M.register_all()
     if M._menu_registered then return end
     menu_defs.register_all()
     config.register_menu()
-    engine_chams.register()
     M._menu_registered = true
 end
 
 function M.init()
     M.register_all()
     config.autoload()
+    gun_mods.init()
+    movement_ctrl.install()
+    movement_ready = true
     return true
 end
 
@@ -6224,7 +7229,16 @@ function M.update(_dt)
     menu.set_visible("silent_fov_fill", s.silent_aim_enabled and s.silent_draw_fov)
     menu.set_visible("silent_gadget_aim", s.silent_aim_enabled)
     menu.set_visible("silent_gadget_team_check", s.silent_aim_enabled and s.silent_gadget_aim)
-    engine_chams.update_visibility(s)
+    menu.set_visible("silent_hitscan_vis", s.silent_aim_enabled and s.silent_hitscan)
+    menu.set_visible("fov_changer_value", s.fov_changer_enabled == true)
+    menu.set_visible("june_fly_speed", s.june_fly_enabled == true)
+    menu.set_visible("june_fly_noclip", s.june_fly_enabled == true)
+    menu.set_visible("june_slowfall_speed", s.june_slowfall_enabled == true)
+    menu.set_visible("june_speed_boost_mult", s.june_speed_boost_enabled == true)
+    menu.set_visible("june_gm_firerate_val", s.june_gunmods_enabled and s.june_gm_firerate)
+    menu.set_visible("june_gm_damage_val", s.june_gunmods_enabled and s.june_gm_damage)
+    menu.set_visible("june_gm_range_val", s.june_gunmods_enabled and s.june_gm_range)
+    menu.set_visible("june_gm_speed_val", s.june_gunmods_enabled and s.june_gm_speed)
     scan.update_char_models()
     scan.scan_players()
     scan.scan_world()
@@ -6232,7 +7246,11 @@ function M.update(_dt)
     aimbot.process_toggle("world_enabled", cache.toggles.world, "world_enabled")
     silent_aim.update(_dt)
     aimbot.process_aimbot()
-    engine_chams.update()
+    fov_changer.process_fov_changer()
+    gun_mods.update(_dt)
+    if movement_ready then
+        movement_ctrl.tick(_dt)
+    end
 end
 
 function M.draw()

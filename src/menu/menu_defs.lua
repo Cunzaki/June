@@ -102,7 +102,6 @@ M.menu_items = {
         v = 0,
         p = "aimbot_enabled"
     },
-    {g = "Combat", t = "checkbox", id = "aimbot_sticky", n = "Sticky Aim", v = false, p = "aimbot_enabled"},
     {g = "Combat", t = "checkbox", id = "aimbot_flick", n = "Flick Mode", v = false, p = "aimbot_enabled"},
     {g = "Combat", t = "checkbox", id = "aimbot_vischeck", n = "Visibility Check", v = false, p = "aimbot_enabled"},
     {
@@ -173,11 +172,16 @@ M.menu_items = {
         v = 0,
         p = "silent_aim_enabled"
     },
-    {g = "Combat", t = "checkbox", id = "silent_filter_health", n = "Silent Health Check", v = false, p = "silent_aim_enabled"},
+    {g = "Combat", t = "checkbox", id = "aimbot_health_check", n = "Aimbot Health Check", v = true, p = "aimbot_enabled"},
+    {g = "Combat", t = "checkbox", id = "silent_filter_health", n = "Silent Health Check", v = true, p = "silent_aim_enabled"},
     {g = "Combat", t = "checkbox", id = "silent_filter_visible", n = "Silent Visible Only", v = false, p = "silent_aim_enabled"},
     {g = "Combat", t = "checkbox", id = "silent_gadget_aim", n = "Silent Gadget Aim", v = false, p = "silent_aim_enabled"},
     {g = "Combat", t = "checkbox", id = "silent_gadget_team_check", n = "Silent Gadget Team Check", v = false, p = "silent_gadget_aim"},
     {g = "Combat", t = "checkbox", id = "silent_filter_team", n = "Silent Team Check", v = false, p = "silent_aim_enabled"},
+    {g = "Combat", t = "separator"},
+    {g = "Combat", t = "label", n = "Silent Exploits"},
+    {g = "Combat", t = "checkbox", id = "silent_hitscan", n = "Hitscan", v = false, p = "silent_aim_enabled"},
+    {g = "Combat", t = "checkbox", id = "silent_hitscan_vis", n = "Hitscan Ray Visual", v = false, p = "silent_hitscan"},
     {
         g = "Combat",
         t = "slider_int",
@@ -198,7 +202,6 @@ M.menu_items = {
         v = 150,
         p = "silent_aim_enabled"
     },
-    {g = "Combat", t = "checkbox", id = "silent_sticky", n = "Silent Sticky Target", v = false, p = "silent_aim_enabled"},
     {g = "Combat", t = "checkbox", id = "silent_prediction", n = "Silent Prediction", v = false, p = "silent_aim_enabled"},
     {
         g = "Combat",
@@ -246,6 +249,34 @@ M.menu_items = {
         p = "silent_aim_enabled",
         c = {1, 0.25, 0.25, 1}
     },
+    {g = "Gun Mods", t = "checkbox", id = "june_gunmods_enabled", n = "Enable Gun Mods", v = false},
+    {g = "Gun Mods", t = "input", id = "june_gm_status", n = "GC Status", v = "Off", p = "june_gunmods_enabled"},
+    {g = "Gun Mods", t = "label", n = "Weapon Stats (equipped gun)"},
+    {g = "Gun Mods", t = "checkbox", id = "june_gm_recoil", n = "Low Recoil", v = false, p = "june_gunmods_enabled"},
+    {g = "Gun Mods", t = "checkbox", id = "june_gm_firerate", n = "Fire Rate", v = false, p = "june_gunmods_enabled"},
+    {g = "Gun Mods", t = "slider_int", id = "june_gm_firerate_val", n = "Firerate (RPM)", min = 60, max = 400, v = 300, p = "june_gm_firerate"},
+    {g = "Gun Mods", t = "checkbox", id = "june_gm_damage", n = "Damage", v = false, p = "june_gunmods_enabled"},
+    {g = "Gun Mods", t = "slider_int", id = "june_gm_damage_val", n = "Damage", min = 1, max = 120, v = 100, p = "june_gm_damage"},
+    {g = "Gun Mods", t = "checkbox", id = "june_gm_range", n = "Range", v = false, p = "june_gunmods_enabled"},
+    {g = "Gun Mods", t = "slider_int", id = "june_gm_range_val", n = "Range", min = 1, max = 100, v = 80, p = "june_gm_range"},
+    {g = "Gun Mods", t = "checkbox", id = "june_gm_destructive", n = "Destructive (wallbang)", v = false, p = "june_gunmods_enabled"},
+    {g = "Gun Mods", t = "slider_int", id = "june_gm_destructive_val", n = "Destructive", min = 1, max = 30, v = 20, p = "june_gm_destructive"},
+    {g = "Gun Mods", t = "checkbox", id = "june_gm_lightweight", n = "Lightweight (move speed)", v = false, p = "june_gunmods_enabled"},
+    {g = "Gun Mods", t = "slider_int", id = "june_gm_lightweight_val", n = "Weight %", min = 85, max = 100, v = 100, p = "june_gm_lightweight"},
+    {g = "Gun Mods", t = "separator"},
+    {g = "Gun Mods", t = "label", n = "GC Exploits (character / match)"},
+    {g = "Gun Mods", t = "checkbox", id = "june_gc_speed_mult", n = "Speed Multiplier", v = false, p = "june_gunmods_enabled"},
+    {g = "Gun Mods", t = "slider_int", id = "june_gc_speed_mult_val", n = "Speed Mult %", min = 100, max = 140, v = 115, p = "june_gc_speed_mult"},
+    {g = "Gun Mods", t = "checkbox", id = "june_gc_infinite_ammo", n = "Infinite Ammo (fuel)", v = false, p = "june_gunmods_enabled"},
+    {g = "Movement", t = "checkbox", id = "june_move_desync", n = "Movement Desync", v = true},
+    {g = "Movement", t = "label", n = "Autosend pulse 0.1s — physics choke then brief resync"},
+    {g = "Movement", t = "checkbox", id = "june_fly_enabled", n = "Fly", v = false, k = 0x46},
+    {g = "Movement", t = "slider_int", id = "june_fly_speed", n = "Fly Speed", min = 2, max = 4, v = 3, p = "june_fly_enabled"},
+    {g = "Movement", t = "checkbox", id = "june_fly_noclip", n = "Fly Noclip", v = false, p = "june_fly_enabled"},
+    {g = "Movement", t = "checkbox", id = "june_slowfall_enabled", n = "Slowfall", v = false},
+    {g = "Movement", t = "slider_int", id = "june_slowfall_speed", n = "Fall Speed", min = 1, max = 50, v = 5, p = "june_slowfall_enabled"},
+    {g = "Movement", t = "checkbox", id = "june_speed_boost_enabled", n = "Speed Boost", v = false},
+    {g = "Movement", t = "slider_int", id = "june_speed_boost_mult", n = "Speed Boost %", min = 0, max = 30, v = 12, p = "june_speed_boost_enabled"},
     {g = "Players", t = "checkbox", id = "players_enabled", n = "Enable Player Visuals", v = false, k = 0x73, c = {1, 1, 1, 1}},
     {g = "Players", t = "checkbox", id = "players_box", n = "Player Box", v = true, p = "players_enabled"},
     {
@@ -396,72 +427,6 @@ M.menu_items = {
         c = {1, 0.2, 0.2, 1}
     },
     {g = "Players", t = "checkbox", id = "players_team", n = "Show Teammates", v = false, p = "players_enabled"},
-    {g = "Players", t = "separator"},
-    {g = "Players", t = "label", n = "Engine Chams"},
-    {
-        g = "Players",
-        t = "multicombo",
-        id = "players_engine_chams",
-        n = "Player Engine Chams",
-        o = {
-            "Head",
-            "Torso",
-            "Left Arm",
-            "Right Arm",
-            "Left Leg",
-            "Right Leg",
-            "Left Shoulder",
-            "Right Shoulder",
-            "Left Hip",
-            "Right Hip",
-        },
-        v = {false, false, false, false, false, false, false, false, false, false},
-        p = "players_enabled"
-    },
-    {
-        g = "Players",
-        t = "combo",
-        id = "players_engine_chams_mode",
-        n = "Player Chams Mode",
-        o = {"Fill", "Wireframe", "Fill Glow", "Wireframe Glow"},
-        v = 0,
-        p = "players_enabled"
-    },
-    {
-        g = "Players",
-        t = "combo",
-        id = "players_engine_chams_color",
-        n = "Player Chams Color",
-        o = {"Default", "Red", "Green", "Yellow", "Blue", "Magenta", "Cyan"},
-        v = 0,
-        p = "players_enabled"
-    },
-    {
-        g = "Players",
-        t = "slider_int",
-        id = "players_engine_chams_range",
-        n = "Player Chams Range",
-        min = 1,
-        max = 500,
-        v = 250,
-        p = "players_enabled"
-    },
-    {
-        g = "Players",
-        t = "checkbox",
-        id = "players_engine_chams_team_check",
-        n = "Chams Team Check",
-        v = true,
-        p = "players_enabled"
-    },
-    {
-        g = "Players",
-        t = "checkbox",
-        id = "players_engine_chams_vischeck",
-        n = "Chams Visibility Check",
-        v = false,
-        p = "players_enabled"
-    },
     {g = "World", t = "checkbox", id = "world_enabled", n = "Enable World Visuals", v = false, k = 0x74},
     {g = "World", t = "checkbox", id = "world_team_check", n = "Gadget Team Check", v = false, p = "world_enabled"},
     {
@@ -474,75 +439,6 @@ M.menu_items = {
         p = "world_enabled"
     },
     {g = "World", t = "separator"},
-    {g = "World", t = "label", n = "Engine Chams"},
-    {
-        g = "World",
-        t = "multicombo",
-        id = "world_engine_chams",
-        n = "World Engine Chams",
-        o = {
-            "Bomb",
-            "Defuser",
-            "Claymore",
-            "Drone",
-            "StunGrenade",
-            "SmokeGrenade",
-            "EMPGrenade",
-            "ImpactGrenade",
-            "BreachCharge",
-            "RemoteC4",
-            "FragGrenade",
-            "StickyCamera",
-            "SignalDisruptor",
-            "HardBreachCharge",
-            "ProximityAlarm",
-            "BarbedWire",
-            "IncendiaryGrenade",
-            "IncendiaryCanister",
-            "BulletproofCamera",
-            "DeployableShield",
-            "ThermiteCharge",
-            "ShockBattery",
-            "NeedleMine",
-            "ToxicCharge",
-            "MetalBarricade",
-            "Map Cam",
-        },
-        v = {
-            false, false, false, false, false, false, false, false, false, false,
-            false, false, false, false, false, false, false, false, false, false,
-            false, false, false, false, false, false,
-        },
-        p = "world_enabled"
-    },
-    {
-        g = "World",
-        t = "combo",
-        id = "world_engine_chams_mode",
-        n = "World Chams Mode",
-        o = {"Fill", "Wireframe", "Fill Glow", "Wireframe Glow"},
-        v = 0,
-        p = "world_enabled"
-    },
-    {
-        g = "World",
-        t = "combo",
-        id = "world_engine_chams_color",
-        n = "World Chams Color",
-        o = {"Default", "Red", "Green", "Yellow", "Blue", "Magenta", "Cyan"},
-        v = 0,
-        p = "world_enabled"
-    },
-    {
-        g = "World",
-        t = "slider_int",
-        id = "world_engine_chams_range",
-        n = "World Chams Range",
-        min = 1,
-        max = 500,
-        v = 250,
-        p = "world_enabled"
-    },
     {
         g = "World",
         t = "multicombo",
@@ -717,6 +613,20 @@ M.menu_items = {
         p = "world_enabled"
     },
     {g = "Settings", t = "separator"},
+    {g = "Settings", t = "label", n = "Combat"},
+    {g = "Settings", t = "checkbox", id = "health_check", n = "Health Check", v = true},
+    {g = "Settings", t = "checkbox", id = "fov_changer_enabled", n = "FOV Changer", v = false},
+    {
+        g = "Settings",
+        t = "slider_int",
+        id = "fov_changer_value",
+        n = "Custom FOV",
+        min = 60,
+        max = 90,
+        v = 90,
+        p = "fov_changer_enabled"
+    },
+    {g = "Settings", t = "separator"},
     {g = "Settings", t = "label", n = "Overlay"},
     {g = "Settings", t = "slider_int", id = "font_size_name", n = "Name Font Size", min = 8, max = 24, v = 14},
     {g = "Settings", t = "slider_int", id = "font_size_weapon", n = "Weapon Font Size", min = 8, max = 24, v = 12},
@@ -802,6 +712,8 @@ function M.register_all()
             menu.add_separator(M.TAB, m.g)
         elseif m.t == "label" then
             menu.add_label(M.TAB, m.g, m.n)
+        elseif m.t == "input" then
+            menu.add_input(M.TAB, m.g, m.id, m.n, m.v, opts)
         end
     end
 end

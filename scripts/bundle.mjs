@@ -11,6 +11,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = path.join(ROOT, "src");
 const OUT = path.join(ROOT, "june.lua");
 
+// Bundle order = load order. Any June.require() at module top level must appear
+// AFTER its dependencies in this list (IIFE runs immediately when bundled).
 const ORDER = [
   "core/constants.lua",
   "core/env.lua",
@@ -24,22 +26,31 @@ const ORDER = [
   "game/shootable_gadgets.lua",
   "menu/menu_defs.lua",
   "core/settings.lua",
-  "core/gpu_chams.lua",
+  "core/health.lua",
+  "game/combat_origin.lua",
   "core/draw_util.lua",
   "game/world_scan.lua",
   "core/silent_ray.lua",
+  "core/combat_vis.lua",
   "core/vis_util.lua",
+  "features/combat/hitscan_ray.lua",
   "features/combat/silent_resolve.lua",
+  "features/visuals/hitscan_visuals.lua",
   "features/utility/config.lua",
   "features/combat/scan.lua",
   "features/combat/aimbot.lua",
   "features/combat/silent_aim.lua",
+  "game/gc_weapon_mods.lua",
+  "features/combat/gun_mods.lua",
+  "core/movement_bypass.lua",
+  "core/cframe_move.lua",
+  "core/movement_ctrl.lua",
   "features/visuals/player_esp.lua",
   "features/visuals/world_esp.lua",
-  "features/visuals/engine_chams.lua",
   "features/visuals/aimbot_visuals.lua",
   "features/visuals/crosshair.lua",
   "features/utility/keybind_window.lua",
+  "features/utility/fov_changer.lua",
   "menu/tabs.lua",
   "app.lua",
 ];

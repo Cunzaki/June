@@ -1,6 +1,7 @@
 local constants = June.require("core.constants")
 local settings = June.require("core.settings")
 local cache = June.require("core.cache")
+local health = June.require("core.health")
 local shootable_gadgets = June.require("game.shootable_gadgets")
 
 local sqrt = constants.sqrt
@@ -86,7 +87,7 @@ local function is_target_valid(lt)
     end
     for _, p in ipairs(cache.players) do
         if p.viewmodel == lt.viewmodel then
-            return p.health > 0 and p.dist <= (s.aimbot_max_distance or 500)
+            return (not s.aimbot_health_check or health.passes(s, p)) and p.dist <= (s.aimbot_max_distance or 500)
         end
     end
     return false
@@ -252,11 +253,6 @@ function M.process_aimbot()
     local lmb_clicked = lmb_kd and not cache.aim.last_lmb_state
     cache.aim.last_lmb_state = lmb_kd
 
-    local sticky_on = s.aimbot_sticky and kd
-    if not sticky_on then
-        cache.aim.locked_target = nil
-    end
-
     if not kd then
         cache.aim.current_target = nil
         return
@@ -266,29 +262,11 @@ function M.process_aimbot()
     local fov = s.aimbot_fov or 125
     local smooth = s.aimbot_smooth or 5
 
-    if sticky_on and cache.aim.locked_target and is_target_valid(cache.aim.locked_target) then
-        local tpos = locked_world_pos()
-        if tpos then
-            local sx, sy = world_to_aim_screen(tpos.x, tpos.y, tpos.z)
-            if sx then
-                cache.aim.current_target = {
-                    target = cache.aim.locked_target,
-                    pos = tpos,
-                    screen_x = sx,
-                    screen_y = sy
-                }
-                aim_at_screen(sx, sy, cx, cy, smooth, lmb_kd, lmb_clicked)
-                return
-            end
-        end
-        cache.aim.locked_target = nil
-    end
-
     local best, bd = nil, math.huge
     local max_dist = s.aimbot_max_distance or 500
 
     for _, p in ipairs(cache.players) do
-        if p.health and p.health > 0
+        if (not s.aimbot_health_check or health.passes(s, p))
             and (not s.aimbot_team_check or not p.is_teammate)
             and p.dist <= max_dist
             and (not s.aimbot_vischeck or p.is_visible)
@@ -350,9 +328,6 @@ function M.process_aimbot()
 
     if best then
         cache.aim.current_target = best
-        if s.aimbot_sticky and not cache.aim.locked_target then
-            cache.aim.locked_target = best.target
-        end
         aim_at_screen(best.screen_x, best.screen_y, cx, cy, smooth, lmb_kd, lmb_clicked)
     else
         cache.aim.current_target = nil

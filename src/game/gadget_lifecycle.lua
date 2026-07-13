@@ -206,12 +206,31 @@ function M.find_anchor(obj, item)
     end
 
     local seen = {}
+    local function consider(part)
+        if part and not seen[part] and part_visible(part) then
+            seen[part] = true
+            return part
+        end
+        return nil
+    end
+
     for _, name in ipairs(names) do
         if not seen[name] then
             seen[name] = true
             local part = obj:FindFirstChild(name)
-            if part_visible(part) then
+            part = consider(part)
+            if part then
                 return part
+            end
+            if obj.GetDescendants then
+                for _, desc in ipairs(obj:GetDescendants()) do
+                    if desc.Name == name then
+                        part = consider(desc)
+                        if part then
+                            return part
+                        end
+                    end
+                end
             end
         end
     end

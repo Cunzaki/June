@@ -4,6 +4,8 @@ M.TAB = "June"
 
 M.G = {
     COMBAT = "Combat",
+    GUN_MODS = "Gun Mods",
+    MOVEMENT = "Movement",
     PLAYERS = "Players",
     WORLD = "World",
     SETTINGS = "Settings",
@@ -30,7 +32,8 @@ function M.ensure_groups()
     M.ensure_tab()
 
     local rows = {
-        { M.G.COMBAT, M.G.PLAYERS },
+        { M.G.COMBAT, M.G.GUN_MODS },
+        { M.G.MOVEMENT, M.G.PLAYERS },
         { M.G.WORLD, M.G.SETTINGS },
     }
 

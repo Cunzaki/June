@@ -8,25 +8,30 @@ local aimbot = June.require("features.combat.aimbot")
 local silent_aim = June.require("features.combat.silent_aim")
 local player_esp = June.require("features.visuals.player_esp")
 local world_esp = June.require("features.visuals.world_esp")
-local engine_chams = June.require("features.visuals.engine_chams")
 local aimbot_visuals = June.require("features.visuals.aimbot_visuals")
 local crosshair = June.require("features.visuals.crosshair")
 local keybind_window = June.require("features.utility.keybind_window")
+local fov_changer = June.require("features.utility.fov_changer")
+local gun_mods = June.require("features.combat.gun_mods")
+local movement_ctrl = June.require("core.movement_ctrl")
 
 local M = {}
+local movement_ready = false
 M._menu_registered = false
 
 function M.register_all()
     if M._menu_registered then return end
     menu_defs.register_all()
     config.register_menu()
-    engine_chams.register()
     M._menu_registered = true
 end
 
 function M.init()
     M.register_all()
     config.autoload()
+    gun_mods.init()
+    movement_ctrl.install()
+    movement_ready = true
     return true
 end
 
@@ -64,7 +69,16 @@ function M.update(_dt)
     menu.set_visible("silent_fov_fill", s.silent_aim_enabled and s.silent_draw_fov)
     menu.set_visible("silent_gadget_aim", s.silent_aim_enabled)
     menu.set_visible("silent_gadget_team_check", s.silent_aim_enabled and s.silent_gadget_aim)
-    engine_chams.update_visibility(s)
+    menu.set_visible("silent_hitscan_vis", s.silent_aim_enabled and s.silent_hitscan)
+    menu.set_visible("fov_changer_value", s.fov_changer_enabled == true)
+    menu.set_visible("june_fly_speed", s.june_fly_enabled == true)
+    menu.set_visible("june_fly_noclip", s.june_fly_enabled == true)
+    menu.set_visible("june_slowfall_speed", s.june_slowfall_enabled == true)
+    menu.set_visible("june_speed_boost_mult", s.june_speed_boost_enabled == true)
+    menu.set_visible("june_gm_firerate_val", s.june_gunmods_enabled and s.june_gm_firerate)
+    menu.set_visible("june_gm_damage_val", s.june_gunmods_enabled and s.june_gm_damage)
+    menu.set_visible("june_gm_range_val", s.june_gunmods_enabled and s.june_gm_range)
+    menu.set_visible("june_gm_speed_val", s.june_gunmods_enabled and s.june_gm_speed)
     scan.update_char_models()
     scan.scan_players()
     scan.scan_world()
@@ -72,7 +86,11 @@ function M.update(_dt)
     aimbot.process_toggle("world_enabled", cache.toggles.world, "world_enabled")
     silent_aim.update(_dt)
     aimbot.process_aimbot()
-    engine_chams.update()
+    fov_changer.process_fov_changer()
+    gun_mods.update(_dt)
+    if movement_ready then
+        movement_ctrl.tick(_dt)
+    end
 end
 
 function M.draw()
