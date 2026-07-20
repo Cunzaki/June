@@ -63,11 +63,11 @@ const ORDER = [
 const header = `--[[
     June — Project Vector script
     Built: ${new Date().toISOString()}
-    UI: custom Neverlose menu (INSERT) — Vector menu tabs disabled
+    UI: custom June menu (INSERT) — Vector menu tabs disabled
 ]]
 
 June = {
-    version = "1.1.7",
+    version = "1.1.8",
     debug = false,
     _mods = {},
     bundled = true,
@@ -111,7 +111,7 @@ local ok, err = pcall(function()
         return
     end
 
-    print("[June] v" .. (June.version or "?") .. " ready — INSERT for Neverlose menu")
+    print("[June] v" .. (June.version or "?") .. " ready — INSERT for June menu")
 end)
 
 if not ok then
