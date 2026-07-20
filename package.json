@@ -1,0 +1,12 @@
+{
+  "name": "june",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/bundle.mjs",
+    "extract-images": "node scripts/extract-gadget-images.mjs",
+    "download-assets": "node scripts/download-assets.mjs",
+    "download-missing": "node scripts/download-assets.mjs --missing-only",
+    "assets": "node scripts/extract-gadget-images.mjs && node scripts/download-assets.mjs"
+  }
+}

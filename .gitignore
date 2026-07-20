@@ -1,0 +1,42 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Dependencies
+node_modules/
+
+# Backups
+*.bak
+
+# Vector load copy (bundled output is june.lua)
+Script 1.lua
+
+# Local-only RE / reference material
+references/
+RE/
+
+# Game dump (large; local only)
+dump/
+
+# Local agent/dev notes (not needed for loadstrings)
+AGENTS.md
+docs/
+
+# One-time migration helpers
+scripts/split_monolith.mjs
+
+# Cursor IDE
+.cursor/
+
+# Generated asset reports
+assets/missing.json
+
+# Local Vector config files
+June_Slot_*.txt
+June_meta.txt
+
+# Editor / local env
+*.local
+.env
+.env.*
