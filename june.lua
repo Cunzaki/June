@@ -1,11 +1,11 @@
 --[[
     June — Project Vector script
-    Built: 2026-07-20T05:43:11.332Z
+    Built: 2026-07-21T00:47:20.458Z
     UI: custom June menu (INSERT) — Vector menu tabs disabled
 ]]
 
 June = {
-    version = "1.1.8",
+    version = "1.2.0",
     debug = false,
     _mods = {},
     bundled = true,
@@ -714,6 +714,7 @@ M.menu_items = {
         p = "silent_aim_enabled"
     },
     {g = "Combat", t = "checkbox", id = "silent_filter_health", n = "Silent Health Check", v = false, p = "silent_aim_enabled"},
+    {g = "Combat", t = "checkbox", id = "silent_hitscan", n = "Hitscan", v = false, p = "silent_aim_enabled"},
     {g = "Combat", t = "checkbox", id = "silent_filter_visible", n = "Silent Visible Only", v = false, p = "silent_aim_enabled"},
     {g = "Combat", t = "checkbox", id = "silent_gadget_aim", n = "Silent Gadget Aim", v = false, p = "silent_aim_enabled"},
     {g = "Combat", t = "checkbox", id = "silent_players_priority", n = "Silent Players Over Gadgets", v = false, p = "silent_gadget_aim"},
@@ -1981,6 +1982,192 @@ function M.is_shootable_entry(w)
     end
 
     return true
+end
+
+return M
+
+end)()
+
+-- ── game/combat_origin.lua ──
+June._mods["game.combat_origin"] = (function()
+local env = June.require("core.env")
+local cache = June.require("core.cache")
+
+local M = {}
+
+local frame = {t = 0, muzzle = nil, server = nil}
+
+local MUZZLE_NAMES = {"Muzzle", "FlashPart", "Flash", "BarrelPart", "UpperBarrel", "Barrel", "Grip"}
+
+local function tick_ms()
+    return utility and utility.get_tick_count and utility.get_tick_count() or 0
+end
+
+local function part_pos(part)
+    if not part then
+        return nil
+    end
+    local pos = part.Position or part.position
+    if not pos then
+        return nil
+    end
+    local x = pos.X or pos.x
+    local y = pos.Y or pos.y
+    local z = pos.Z or pos.z
+    if not x then
+        return nil
+    end
+    return {x = x, y = y, z = z}
+end
+
+local function find_named_part(root)
+    if not root or not root.GetDescendants then
+        return nil
+    end
+    for _, name in ipairs(MUZZLE_NAMES) do
+        local direct = root:FindFirstChild(name)
+        if direct and direct.Position then
+            return direct
+        end
+    end
+    for _, desc in ipairs(root:GetDescendants()) do
+        for _, name in ipairs(MUZZLE_NAMES) do
+            if desc.Name == name and desc.Position then
+                return desc
+            end
+        end
+    end
+    return nil
+end
+
+local function local_viewmodel()
+    if not cache.ws then
+        return nil
+    end
+    local vms = cache.ws:FindFirstChild("Viewmodels")
+    if not vms then
+        return nil
+    end
+    return vms:FindFirstChild("LocalViewmodel")
+end
+
+local function find_weapon_model(vm)
+    if not vm then
+        return nil
+    end
+    for _, child in ipairs(vm:GetChildren()) do
+        if child.ClassName == "Model" and not cache.body_part_names[child.Name] then
+            if child:FindFirstChild("Magazine") or find_named_part(child) then
+                return child
+            end
+        end
+    end
+    return nil
+end
+
+local function compute_muzzle()
+    local vm = local_viewmodel()
+    if vm then
+        local weapon = find_weapon_model(vm)
+        local part = find_named_part(weapon) or find_named_part(vm)
+        local pos = part_pos(part)
+        if pos then
+            return pos
+        end
+        local head = vm:FindFirstChild("head")
+        pos = part_pos(head)
+        if pos then
+            return pos
+        end
+    end
+
+    if camera and camera.get_position then
+        local ok, pos = pcall(camera.get_position)
+        if ok and pos then
+            local x = pos.X or pos.x
+            local y = pos.Y or pos.y
+            local z = pos.Z or pos.z
+            if x then
+                return {x = x, y = y, z = z}
+            end
+        end
+    end
+
+    return nil
+end
+
+local function compute_server()
+    if entity and entity.get_local_player then
+        local lp = entity.get_local_player()
+        if lp and lp.position then
+            local p = lp.position
+            local x = p.X or p.x
+            local y = p.Y or p.y
+            local z = p.Z or p.z
+            if x then
+                return {x = x, y = y, z = z}
+            end
+        end
+    end
+
+    local lp = env.get_local_player()
+    if lp then
+        local char = lp.character or lp.Character
+        if char then
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            local pos = part_pos(hrp)
+            if pos then
+                return pos
+            end
+        end
+    end
+
+    return nil
+end
+
+function M.invalidate()
+    frame.t = 0
+    frame.muzzle = nil
+    frame.server = nil
+end
+
+function M.sync()
+    local now = tick_ms()
+    if frame.t == now and frame.muzzle and frame.server then
+        return
+    end
+    frame.t = now
+    frame.muzzle = compute_muzzle()
+    frame.server = compute_server()
+end
+
+function M.get_muzzle_origin()
+    M.sync()
+    return frame.muzzle
+end
+
+function M.get_server_origin()
+    M.sync()
+    return frame.server
+end
+
+function M.has_weapon()
+    return find_weapon_model(local_viewmodel()) ~= nil
+end
+
+function M.get_camera_origin()
+    if camera and camera.get_position then
+        local ok, pos = pcall(camera.get_position)
+        if ok and pos then
+            local x = pos.X or pos.x
+            local y = pos.Y or pos.y
+            local z = pos.Z or pos.z
+            if x then
+                return {x = x, y = y, z = z}
+            end
+        end
+    end
+    return nil
 end
 
 return M
@@ -4642,6 +4829,7 @@ local function build_aimbot()
             combo("vis_check_priority", "Vis Priority", { "Distance", "Crosshair" }, 0, "silent_filter_visible"),
             cb("silent_filter_team", "Team Check", false),
             cb("silent_filter_health", "Health Check", false),
+            cb("silent_hitscan", "Hitscan", false),
             sep(),
             label("Gadget Aim", false),
             cb("silent_gadget_aim", "Gadget Aim", false),
@@ -6619,19 +6807,18 @@ end)()
 
 -- ── core/silent_ray.lua ──
 June._mods["core.silent_ray"] = (function()
---[[ Silent raycast hook — Vector API track_silent_target (see docs/API.md). ]]
-
 local env = June.require("core.env")
 
 local M = {}
 
 local hook_ready = false
-local tracking = false
-local MOUSE_RAY_LEN = 1024
+local armed = false
+local SHOOT_VK = 0x01
 
 M._last_origin = nil
 M._last_target = nil
 M._last_ok = false
+M._last_track_key = nil
 
 local function unpack_pos(v)
     if not v then return nil end
@@ -6647,6 +6834,17 @@ local function make_vec3(x, y, z)
     return { x = x, y = y, z = z }
 end
 
+local function shoot_key(vk)
+    return vk or SHOOT_VK
+end
+
+local function lmb_down(vk)
+    if not input or not input.is_key_down then
+        return false
+    end
+    return input.is_key_down(shoot_key(vk)) == true
+end
+
 function M.available()
     return raycast
         and raycast.track_silent_target
@@ -6654,22 +6852,31 @@ function M.available()
 end
 
 function M.ensure_hook()
-    if not M.available() then return false end
+    if not M.available() then
+        return false
+    end
     if hook_ready or (raycast.is_silent_hook_active and raycast.is_silent_hook_active()) then
         hook_ready = true
+        armed = true
         return true
     end
     if not raycast.enable_silent_hook then
         hook_ready = true
+        armed = true
         return true
     end
     local ok = raycast.enable_silent_hook()
     hook_ready = ok == true
+    armed = hook_ready
     return hook_ready
 end
 
+function M.is_armed()
+    return armed
+end
+
 function M.is_tracking()
-    return tracking
+    return armed and M._last_ok
 end
 
 function M.get_camera_origin()
@@ -6699,8 +6906,11 @@ function M.stop()
     M._last_origin = nil
     M._last_target = nil
     M._last_ok = false
-    tracking = false
-    if not M.available() then return end
+    M._last_track_key = nil
+    armed = false
+    if not M.available() then
+        return
+    end
     pcall(raycast.stop_silent_tracking)
     if raycast.clear_silent_target then
         pcall(raycast.clear_silent_target)
@@ -6711,17 +6921,42 @@ function M.last_segment()
     return M._last_origin, M._last_target
 end
 
-function M.track(origin, aim_point, shoot_vk)
+local function push_silent(origin_v, dir_v)
+    if raycast.set_silent_target then
+        return pcall(raycast.set_silent_target, origin_v, dir_v) == true
+    end
+    return false
+end
+
+local function push_track(origin_v, dir_v, key)
+    if not raycast.track_silent_target then
+        return false
+    end
+    local ok_call, ok = pcall(raycast.track_silent_target, origin_v, dir_v, key)
+    return ok_call and ok == true
+end
+
+-- direction = target - origin (NOT normalized, NOT scaled).
+function M.track(origin, aim_point, shoot_vk, hitpart, force)
     M._last_ok = false
-    if not aim_point then return false end
+    if not aim_point then
+        return false
+    end
+
+    if not M.ensure_hook() then
+        return false
+    end
 
     origin = origin or M.get_camera_origin()
-    if not origin then return false end
-    if not M.ensure_hook() then return false end
+    if not origin then
+        return false
+    end
 
     local ox, oy, oz = unpack_pos(origin)
     local ax, ay, az = unpack_pos(aim_point)
-    if not ox or not ax then return false end
+    if not ox or not ax then
+        return false
+    end
 
     local dx, dy, dz = ax - ox, ay - oy, az - oz
     local dist = math.sqrt(dx * dx + dy * dy + dz * dz)
@@ -6734,30 +6969,41 @@ function M.track(origin, aim_point, shoot_vk)
             dist = math.sqrt(dx * dx + dy * dy + dz * dz)
         end
         if not dist or dist < 0.001 then
-            dir = make_vec3(0, MOUSE_RAY_LEN * 0.01, 0)
+            dir = make_vec3(0, 1, 0)
         else
-            local inv = 1 / dist
-            dir = make_vec3(dx * inv * MOUSE_RAY_LEN, dy * inv * MOUSE_RAY_LEN, dz * inv * MOUSE_RAY_LEN)
+            dir = make_vec3(dx, dy, dz)
         end
     else
-        local inv = 1 / dist
-        dir = make_vec3(dx * inv * MOUSE_RAY_LEN, dy * inv * MOUSE_RAY_LEN, dz * inv * MOUSE_RAY_LEN)
+        dir = make_vec3(dx, dy, dz)
     end
 
     M._last_origin = { x = ox, y = oy, z = oz }
-    M._last_target = { x = ax, y = ay, z = az }
-
-    local origin_v = make_vec3(ox, oy, oz)
-    local key = shoot_vk or 0x01
-
-    local ok = raycast.track_silent_target(origin_v, dir, key) == true
-    if ok and raycast.set_silent_target then
-        pcall(raycast.set_silent_target, origin_v, dir)
+    if hitpart and hitpart.x then
+        M._last_target = { x = hitpart.x, y = hitpart.y, z = hitpart.z }
+    else
+        M._last_target = { x = ax, y = ay, z = az }
     end
 
-    M._last_ok = ok
-    tracking = ok
-    return ok
+    local key = shoot_key(shoot_vk)
+    local firing = lmb_down(key)
+    local track_key = string.format("%.3f|%.3f|%.3f|%.3f|%.3f|%.3f", ox, oy, oz, ax, ay, az)
+    if not force and not firing and M._last_track_key == track_key and M._last_ok then
+        return true
+    end
+
+    local origin_v = make_vec3(ox, oy, oz)
+    local pushed = push_silent(origin_v, dir)
+    local tracked = false
+    if force or firing then
+        tracked = push_track(origin_v, dir, key)
+    end
+
+    M._last_ok = pushed or tracked
+    armed = M._last_ok
+    if M._last_ok then
+        M._last_track_key = track_key
+    end
+    return M._last_ok
 end
 
 return M
@@ -6855,25 +7101,136 @@ return M
 
 end)()
 
--- ── features/combat/silent_resolve.lua ──
-June._mods["features.combat.silent_resolve"] = (function()
---[[ Silent ray origin — camera to target (hitscan). ]]
+-- ── features/combat/hitscan_ray.lua ──
+June._mods["features.combat.hitscan_ray"] = (function()
+-- Operation One hitscan — ray from muzzle through target (Vector silent hook).
 
-local silent_ray = June.require("core.silent_ray")
+local combat_origin = June.require("game.combat_origin")
 
 local M = {}
 
-function M.resolve_track(aim)
+local function copy_pos(p)
+    if not p then return nil end
+    return { x = p.x, y = p.y, z = p.z }
+end
+
+local function unit(dx, dy, dz)
+    local len = math.sqrt(dx * dx + dy * dy + dz * dz)
+    if len < 0.001 then return 0, 0, 0, 0 end
+    local inv = 1 / len
+    return dx * inv, dy * inv, dz * inv, len
+end
+
+function M.build_path(origin, center, muzzle)
+    if not origin or not center then return {} end
+    local out = {}
+    if muzzle then out[#out + 1] = copy_pos(muzzle) end
+    out[#out + 1] = copy_pos(origin)
+    out[#out + 1] = copy_pos(center)
+    return out
+end
+
+local function aim_past(from, target, past)
+    past = past or 2.5
+    local ux, uy, uz, len = unit(target.x - from.x, target.y - from.y, target.z - from.z)
+    if len < 0.001 then
+        return copy_pos(target)
+    end
+    return {
+        x = target.x + ux * past,
+        y = target.y + uy * past,
+        z = target.z + uz * past,
+    }
+end
+
+function M.resolve(opts)
+    opts = opts or {}
+    local center = opts.hitpart
+    if not center then return nil end
+
+    local camera = opts.camera or combat_origin.get_camera_origin()
+    local muzzle = opts.muzzle or combat_origin.get_muzzle_origin()
+    local origin = muzzle or camera
+    if not origin then return nil end
+
+    local aim = aim_past(origin, center, 2.5)
+    return {
+        origin = copy_pos(origin),
+        aim = aim,
+        hitpart = copy_pos(center),
+        path = M.build_path(origin, center, muzzle),
+    }
+end
+
+return M
+
+end)()
+
+-- ── features/combat/silent_resolve.lua ──
+June._mods["features.combat.silent_resolve"] = (function()
+local settings = June.require("core.settings")
+local silent_ray = June.require("core.silent_ray")
+local combat_origin = June.require("game.combat_origin")
+local hitscan_ray = June.require("features.combat.hitscan_ray")
+
+local M = {}
+
+local function aim_past(origin, target, past)
+    if not origin or not target then
+        return nil
+    end
+    past = past or 2.5
+    local dx = target.x - origin.x
+    local dy = target.y - origin.y
+    local dz = target.z - origin.z
+    local len = math.sqrt(dx * dx + dy * dy + dz * dz)
+    if len < 0.001 then
+        return { x = target.x, y = target.y, z = target.z }
+    end
+    local scale = past / len
+    return {
+        x = target.x + dx * scale,
+        y = target.y + dy * scale,
+        z = target.z + dz * scale,
+    }
+end
+
+function M.resolve_track(aim, bone_idx, opts)
     if not aim then
-        return nil, nil
+        return nil, nil, nil
     end
 
-    local camera = silent_ray.get_camera_origin()
+    opts = opts or {}
+    local s = settings.s
+    local is_gadget = opts.is_gadget == true
+    local camera = silent_ray.get_camera_origin() or combat_origin.get_camera_origin()
     if not camera then
-        return nil, nil
+        return nil, nil, nil
     end
 
-    return camera, aim
+    combat_origin.invalidate()
+    local muzzle = combat_origin.get_muzzle_origin()
+    local center = aim
+
+    if s.silent_hitscan == true and not is_gadget then
+        local hs = hitscan_ray.resolve({
+            camera = camera,
+            hitpart = center,
+            muzzle = muzzle,
+        })
+        if hs and hs.origin and hs.aim then
+            return hs.origin, hs.aim, hs.hitpart or center
+        end
+    end
+
+    -- Silent: camera (or muzzle when armed) → through target.
+    local origin = (muzzle and combat_origin.has_weapon()) and muzzle or camera
+    local aim_far = aim_past(origin, center, 2.5)
+    if not aim_far then
+        return nil, nil, nil
+    end
+
+    return origin, aim_far, center
 end
 
 return M
@@ -7888,6 +8245,7 @@ local cache = June.require("core.cache")
 local silent_ray = June.require("core.silent_ray")
 local silent_resolve = June.require("features.combat.silent_resolve")
 local shootable_gadgets = June.require("game.shootable_gadgets")
+local combat_origin = June.require("game.combat_origin")
 
 local sqrt = constants.sqrt
 local AIM_TARGET = constants.AIM_TARGET
@@ -7895,12 +8253,14 @@ local FOV_STYLE = constants.FOV_STYLE
 local TARGET_LINE_STYLE = constants.TARGET_LINE_STYLE
 local SHOOT_VK = 0x01
 local TARGET_SCAN_MS = 33
+local WEAPON_CHECK_MS = 80
 
 local M = {}
 local s = settings.s
 local locked_target = nil
 local last_target_scan = 0
-local weapon_hold_ticks = 0
+local last_weapon_check = 0
+local weapon_holding = false
 local bone_map = {[0] = "head", [1] = "torso", [2] = "arm1", [3] = "arm2", [4] = "leg1", [5] = "leg2"}
 
 local function silent_vis_enabled()
@@ -7942,27 +8302,17 @@ local function live_world_entry(entry)
 end
 
 local function holding_weapon()
-    if not cache.ws then
-        weapon_hold_ticks = math.max(0, weapon_hold_ticks - 1)
-        return weapon_hold_ticks > 0
+    local now = tick_ms()
+    if now - last_weapon_check < WEAPON_CHECK_MS then
+        return weapon_holding
     end
-    local vms = cache.ws:FindFirstChild("Viewmodels")
-    local local_vm = vms and vms:FindFirstChild("LocalViewmodel")
-    local has_weapon = false
-    if local_vm then
-        for _, child in ipairs(local_vm:GetChildren()) do
-            if child.ClassName == "Model" and not cache.body_part_names[child.Name] and child:FindFirstChild("Magazine") then
-                has_weapon = true
-                break
-            end
-        end
+    last_weapon_check = now
+
+    weapon_holding = combat_origin.has_weapon() == true
+    if not weapon_holding and input and input.is_key_down and input.is_key_down(SHOOT_VK) then
+        weapon_holding = true
     end
-    if has_weapon then
-        weapon_hold_ticks = 4
-    else
-        weapon_hold_ticks = math.max(0, weapon_hold_ticks - 1)
-    end
-    return weapon_hold_ticks > 0
+    return weapon_holding
 end
 
 local function live_bone_pos(p, bone_name)
@@ -8220,12 +8570,11 @@ function M.update(_dt)
     end
 
     silent_ray.ensure_hook()
+    combat_origin.invalidate()
 
     if not holding_weapon() then
-        if not (input and input.is_key_down and input.is_key_down(0x01)) then
-            silent_ray.stop()
-            return
-        end
+        silent_ray.stop()
+        return
     end
 
     local cx, cy = cache.screen_w * 0.5, cache.screen_h * 0.5
@@ -8244,13 +8593,15 @@ function M.update(_dt)
         return
     end
 
-    local origin, resolved_aim = silent_resolve.resolve_track(aim)
+    local origin, resolved_aim, hitpart = silent_resolve.resolve_track(aim, s.silent_bone, {
+        is_gadget = is_gadget_target(locked_target),
+    })
     if not origin or not resolved_aim then
         silent_ray.stop()
         return
     end
 
-    silent_ray.track(origin, resolved_aim, SHOOT_VK)
+    silent_ray.track(origin, resolved_aim, SHOOT_VK, hitpart or aim, true)
 end
 
 function M.draw()

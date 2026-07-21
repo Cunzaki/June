@@ -170,6 +170,7 @@ local function build_aimbot()
             combo("vis_check_priority", "Vis Priority", { "Distance", "Crosshair" }, 0, "silent_filter_visible"),
             cb("silent_filter_team", "Team Check", false),
             cb("silent_filter_health", "Health Check", false),
+            cb("silent_hitscan", "Hitscan", false),
             sep(),
             label("Gadget Aim", false),
             cb("silent_gadget_aim", "Gadget Aim", false),

@@ -4,6 +4,7 @@ local cache = June.require("core.cache")
 local silent_ray = June.require("core.silent_ray")
 local silent_resolve = June.require("features.combat.silent_resolve")
 local shootable_gadgets = June.require("game.shootable_gadgets")
+local combat_origin = June.require("game.combat_origin")
 
 local sqrt = constants.sqrt
 local AIM_TARGET = constants.AIM_TARGET
@@ -11,12 +12,14 @@ local FOV_STYLE = constants.FOV_STYLE
 local TARGET_LINE_STYLE = constants.TARGET_LINE_STYLE
 local SHOOT_VK = 0x01
 local TARGET_SCAN_MS = 33
+local WEAPON_CHECK_MS = 80
 
 local M = {}
 local s = settings.s
 local locked_target = nil
 local last_target_scan = 0
-local weapon_hold_ticks = 0
+local last_weapon_check = 0
+local weapon_holding = false
 local bone_map = {[0] = "head", [1] = "torso", [2] = "arm1", [3] = "arm2", [4] = "leg1", [5] = "leg2"}
 
 local function silent_vis_enabled()
@@ -58,27 +61,17 @@ local function live_world_entry(entry)
 end
 
 local function holding_weapon()
-    if not cache.ws then
-        weapon_hold_ticks = math.max(0, weapon_hold_ticks - 1)
-        return weapon_hold_ticks > 0
+    local now = tick_ms()
+    if now - last_weapon_check < WEAPON_CHECK_MS then
+        return weapon_holding
     end
-    local vms = cache.ws:FindFirstChild("Viewmodels")
-    local local_vm = vms and vms:FindFirstChild("LocalViewmodel")
-    local has_weapon = false
-    if local_vm then
-        for _, child in ipairs(local_vm:GetChildren()) do
-            if child.ClassName == "Model" and not cache.body_part_names[child.Name] and child:FindFirstChild("Magazine") then
-                has_weapon = true
-                break
-            end
-        end
+    last_weapon_check = now
+
+    weapon_holding = combat_origin.has_weapon() == true
+    if not weapon_holding and input and input.is_key_down and input.is_key_down(SHOOT_VK) then
+        weapon_holding = true
     end
-    if has_weapon then
-        weapon_hold_ticks = 4
-    else
-        weapon_hold_ticks = math.max(0, weapon_hold_ticks - 1)
-    end
-    return weapon_hold_ticks > 0
+    return weapon_holding
 end
 
 local function live_bone_pos(p, bone_name)
@@ -336,12 +329,11 @@ function M.update(_dt)
     end
 
     silent_ray.ensure_hook()
+    combat_origin.invalidate()
 
     if not holding_weapon() then
-        if not (input and input.is_key_down and input.is_key_down(0x01)) then
-            silent_ray.stop()
-            return
-        end
+        silent_ray.stop()
+        return
     end
 
     local cx, cy = cache.screen_w * 0.5, cache.screen_h * 0.5
@@ -360,13 +352,15 @@ function M.update(_dt)
         return
     end
 
-    local origin, resolved_aim = silent_resolve.resolve_track(aim)
+    local origin, resolved_aim, hitpart = silent_resolve.resolve_track(aim, s.silent_bone, {
+        is_gadget = is_gadget_target(locked_target),
+    })
     if not origin or not resolved_aim then
         silent_ray.stop()
         return
     end
 
-    silent_ray.track(origin, resolved_aim, SHOOT_VK)
+    silent_ray.track(origin, resolved_aim, SHOOT_VK, hitpart or aim, true)
 end
 
 function M.draw()

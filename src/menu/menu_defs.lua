@@ -175,6 +175,7 @@ M.menu_items = {
         p = "silent_aim_enabled"
     },
     {g = "Combat", t = "checkbox", id = "silent_filter_health", n = "Silent Health Check", v = false, p = "silent_aim_enabled"},
+    {g = "Combat", t = "checkbox", id = "silent_hitscan", n = "Hitscan", v = false, p = "silent_aim_enabled"},
     {g = "Combat", t = "checkbox", id = "silent_filter_visible", n = "Silent Visible Only", v = false, p = "silent_aim_enabled"},
     {g = "Combat", t = "checkbox", id = "silent_gadget_aim", n = "Silent Gadget Aim", v = false, p = "silent_aim_enabled"},
     {g = "Combat", t = "checkbox", id = "silent_players_priority", n = "Silent Players Over Gadgets", v = false, p = "silent_gadget_aim"},

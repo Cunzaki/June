@@ -31,6 +31,7 @@ const ORDER = [
   "game/gadget_team.lua",
   "game/gadget_lifecycle.lua",
   "game/shootable_gadgets.lua",
+  "game/combat_origin.lua",
   // Custom UI
   "ui/gs_theme.lua",
   "ui/gs_input.lua",
@@ -46,6 +47,7 @@ const ORDER = [
   "game/world_scan.lua",
   "core/silent_ray.lua",
   "core/vis_util.lua",
+  "features/combat/hitscan_ray.lua",
   "features/combat/silent_resolve.lua",
   "features/utility/config.lua",
   "features/combat/scan.lua",
@@ -67,7 +69,7 @@ const header = `--[[
 ]]
 
 June = {
-    version = "1.1.8",
+    version = "1.2.0",
     debug = false,
     _mods = {},
     bundled = true,
